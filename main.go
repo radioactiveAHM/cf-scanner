@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -13,13 +14,36 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 )
 
+type Conf struct {
+	Hostname    string `json:"Hostname"`
+	Pingtimeout int    `json:"Pingtimeout"`
+	Goroutines  int    `json:"Goroutines"`
+	Scans       int    `json:"Scans"`
+	Maxletency  int64  `json:"Maxletency"`
+}
+
 func main() {
+	// load config file
+	cfile, cfile_err := os.ReadFile("conf.json")
+	if cfile_err != nil {
+		fmt.Println(cfile_err.Error())
+		os.Exit(1)
+	}
+
+	conf := Conf{}
+	conf_err := json.Unmarshal(cfile, &conf)
+	if conf_err != nil {
+		fmt.Println(conf_err.Error())
+		os.Exit(1)
+	}
+
 	fmt.Println("start of app")
 	// input
-	hostname := "discord.com"
-	pingtimeout := 200
-	goroutines := 10
-	scans := 200
+	hostname := conf.Hostname
+	pingtimeout := conf.Pingtimeout
+	goroutines := conf.Goroutines
+	scans := conf.Scans
+	var maxletency int64 = conf.Maxletency
 
 	ch := make(chan string)
 	for range goroutines {
@@ -66,6 +90,9 @@ func main() {
 				respone, http_err := client.Do(&req)
 				e := time.Now()
 				latency := e.UnixMilli() - s.UnixMilli()
+				if latency > maxletency {
+					continue
+				}
 				if http_err != nil {
 					fmt.Println(http_err.Error())
 					continue

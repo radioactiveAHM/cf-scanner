@@ -1,0 +1,7 @@
+{
+    "Hostname": "discord.com",
+    "Pingtimeout": 120,
+    "Goroutines": 10,
+    "Scans": 50,
+    "Maxletency": 400
+}
