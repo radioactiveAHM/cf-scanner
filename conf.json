@@ -1,7 +1,9 @@
 {
     "Hostname": "discord.com",
+    "Scheme": "https",
     "Pingtimeout": 120,
-    "Goroutines": 10,
-    "Scans": 50,
-    "Maxletency": 400
+    "Goroutines": 2,
+    "Scans": 1000,
+    "Maxletency": 1000,
+    "Alpn":["h3", "http/1.1"]
 }

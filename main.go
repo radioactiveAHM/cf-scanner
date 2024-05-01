@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -15,11 +16,13 @@ import (
 )
 
 type Conf struct {
-	Hostname    string `json:"Hostname"`
-	Pingtimeout int    `json:"Pingtimeout"`
-	Goroutines  int    `json:"Goroutines"`
-	Scans       int    `json:"Scans"`
-	Maxletency  int64  `json:"Maxletency"`
+	Hostname    string   `json:"Hostname"`
+	Pingtimeout int      `json:"Pingtimeout"`
+	Goroutines  int      `json:"Goroutines"`
+	Scans       int      `json:"Scans"`
+	Maxletency  int64    `json:"Maxletency"`
+	Scheme      string   `json:"Scheme"`
+	Alpn        []string `json:"Alpn"`
 }
 
 func main() {
@@ -44,6 +47,8 @@ func main() {
 	goroutines := conf.Goroutines
 	scans := conf.Scans
 	var maxletency int64 = conf.Maxletency
+	scheme := conf.Scheme
+	alpn := conf.Alpn
 
 	ch := make(chan string)
 	for range goroutines {
@@ -51,7 +56,7 @@ func main() {
 			for range scans {
 				// pick an ip
 				file, _ := os.ReadFile("ipv4.txt")
-				ranges := strings.Split(string(file), "\r\n")
+				ranges := strings.Split(string(file), "\n")
 				n4 := strconv.Itoa(rand.Intn(255))
 				selected := ranges[rand.Intn(len(ranges))]
 				ip := selected + n4
@@ -71,10 +76,8 @@ func main() {
 					fmt.Println(pinging_err.Error())
 					continue
 				}
-				fmt.Println(pinger.Statistics().AvgRtt)
-
 				// generate http req
-				req := http.Request{Method: "GET", URL: &url.URL{Scheme: "http", Host: ip, Path: "/"}, Host: hostname}
+				req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: ip, Path: "/"}, Host: hostname}
 				req.Header = map[string][]string{
 					"User-Agent":      {"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0)"},
 					"Accept":          {"*/*"},
@@ -82,25 +85,38 @@ func main() {
 					"Accept-Encoding": {"gzip", "deflate", "br", "zstd"},
 				}
 
-				// set timeout for waiting for respone to 1s
-				client := http.DefaultClient
-				client.Timeout = time.Second * 1
+				var client *http.Client
+
+				if conf.Scheme == "https" {
+					tr := &http.Transport{
+						TLSClientConfig: &tls.Config{ServerName: hostname, NextProtos: alpn, MinVersion: tls.VersionTLS13},
+						WriteBufferSize: 8192,
+						ReadBufferSize:  8192,
+					}
+					client = &http.Client{Transport: tr}
+				} else {
+					client = http.DefaultClient
+				}
+
+				client.Timeout = time.Millisecond * time.Duration(maxletency)
 				s := time.Now()
 				// send request
 				respone, http_err := client.Do(&req)
 				e := time.Now()
 				latency := e.UnixMilli() - s.UnixMilli()
-				if latency > maxletency {
-					continue
-				}
 				if http_err != nil {
 					fmt.Println(http_err.Error())
+					continue
+				}
+				if respone.Header.Get("Server") != "cloudflare" {
 					continue
 				}
 
 				println(respone.StatusCode)
 				if respone.StatusCode == 200 {
-					ch <- fmt.Sprintf("%s %s %d\n", ip, pinger.Statistics().AvgRtt, latency)
+					rep := fmt.Sprintf("%s %s %d\n", ip, pinger.Statistics().AvgRtt, latency)
+					fmt.Println(rep)
+					ch <- rep
 				}
 			}
 			ch <- "end"
