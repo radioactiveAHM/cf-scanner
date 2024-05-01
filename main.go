@@ -16,13 +16,13 @@ import (
 )
 
 type Conf struct {
-	Hostname    string   `json:"Hostname"`
-	Pingtimeout int      `json:"Pingtimeout"`
-	Goroutines  int      `json:"Goroutines"`
-	Scans       int      `json:"Scans"`
-	Maxletency  int64    `json:"Maxletency"`
-	Scheme      string   `json:"Scheme"`
-	Alpn        []string `json:"Alpn"`
+	Hostname   string   `json:"Hostname"`
+	MaxPing    int      `json:"MaxPing"`
+	Goroutines int      `json:"Goroutines"`
+	Scans      int      `json:"Scans"`
+	Maxletency int64    `json:"Maxletency"`
+	Scheme     string   `json:"Scheme"`
+	Alpn       []string `json:"Alpn"`
 }
 
 func main() {
@@ -43,7 +43,7 @@ func main() {
 	fmt.Println("start of app")
 	// input
 	hostname := conf.Hostname
-	pingtimeout := conf.Pingtimeout
+	maxping := conf.MaxPing
 	goroutines := conf.Goroutines
 	scans := conf.Scans
 	var maxletency int64 = conf.Maxletency
@@ -65,7 +65,7 @@ func main() {
 				// ping ip
 				pinger, ping_err := probing.NewPinger(ip)
 				pinger.SetPrivileged(true)
-				pinger.Timeout = time.Duration(pingtimeout) * time.Millisecond
+				pinger.Timeout = time.Duration(maxping) * time.Millisecond
 				if ping_err != nil {
 					fmt.Println(ping_err.Error())
 					continue
@@ -76,6 +76,11 @@ func main() {
 					fmt.Println(pinging_err.Error())
 					continue
 				}
+
+				if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(maxping)*time.Millisecond) {
+					continue
+				}
+
 				// generate http req
 				req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: ip, Path: "/"}, Host: hostname}
 				req.Header = map[string][]string{
@@ -114,7 +119,7 @@ func main() {
 
 				println(respone.StatusCode)
 				if respone.StatusCode == 200 {
-					rep := fmt.Sprintf("%s %s %d\n", ip, pinger.Statistics().AvgRtt, latency)
+					rep := fmt.Sprintf("%s %s %d\n", ip, pinger.Statistics().MinRtt, latency)
 					fmt.Println(rep)
 					ch <- rep
 				}
