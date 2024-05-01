@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -29,18 +30,16 @@ func main() {
 	// load config file
 	cfile, cfile_err := os.ReadFile("conf.json")
 	if cfile_err != nil {
-		fmt.Println(cfile_err.Error())
-		os.Exit(1)
+		log.Fatalln(cfile_err.Error())
 	}
 
 	conf := Conf{}
 	conf_err := json.Unmarshal(cfile, &conf)
 	if conf_err != nil {
-		fmt.Println(conf_err.Error())
-		os.Exit(1)
+		log.Fatalln(conf_err.Error())
 	}
 
-	fmt.Println("start of app")
+	log.Println("start of app")
 	// input
 	hostname := conf.Hostname
 	maxping := conf.MaxPing
@@ -60,20 +59,20 @@ func main() {
 				n4 := strconv.Itoa(rand.Intn(255))
 				selected := ranges[rand.Intn(len(ranges))]
 				ip := selected + n4
-				fmt.Println(ip + " selected")
+				log.Println(ip + " selected")
 
 				// ping ip
 				pinger, ping_err := probing.NewPinger(ip)
 				pinger.SetPrivileged(true)
 				pinger.Timeout = time.Duration(maxping) * time.Millisecond
 				if ping_err != nil {
-					fmt.Println(ping_err.Error())
+					log.Println(ping_err.Error())
 					continue
 				}
 				pinger.Count = 1
 				pinging_err := pinger.Run()
 				if pinging_err != nil {
-					fmt.Println(pinging_err.Error())
+					log.Println(pinging_err.Error())
 					continue
 				}
 
@@ -110,7 +109,7 @@ func main() {
 				e := time.Now()
 				latency := e.UnixMilli() - s.UnixMilli()
 				if http_err != nil {
-					fmt.Println(http_err.Error())
+					log.Println(http_err.Error())
 					continue
 				}
 				if respone.Header.Get("Server") != "cloudflare" {
@@ -120,7 +119,7 @@ func main() {
 				println(respone.StatusCode)
 				if respone.StatusCode == 200 {
 					rep := fmt.Sprintf("%s %s %d\n", ip, pinger.Statistics().MinRtt, latency)
-					fmt.Println(rep)
+					log.Println(rep)
 					ch <- rep
 				}
 			}
@@ -140,7 +139,7 @@ func main() {
 		}
 		if v == "end" {
 			deadgoroutines += 1
-			fmt.Println("end of goroutine")
+			log.Println("end of goroutine")
 			continue
 		}
 		file.Write([]byte(v))
