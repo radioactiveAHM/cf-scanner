@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	probing "github.com/prometheus-community/pro-bing"
 )
 
@@ -109,7 +110,7 @@ func main() {
 				e := time.Now()
 				latency := e.UnixMilli() - s.UnixMilli()
 				if http_err != nil {
-					log.Println(http_err.Error())
+					color.Red("%s", http_err.Error())
 					continue
 				}
 				if respone.Header.Get("Server") != "cloudflare" {
@@ -119,7 +120,7 @@ func main() {
 				println(respone.StatusCode)
 				if respone.StatusCode == 200 {
 					rep := fmt.Sprintf("%s %s %d\n", ip, pinger.Statistics().MinRtt, latency)
-					log.Println(rep)
+					color.Cyan("%s", rep)
 					ch <- rep
 				}
 			}
@@ -139,7 +140,7 @@ func main() {
 		}
 		if v == "end" {
 			deadgoroutines += 1
-			log.Println("end of goroutine")
+			color.Green("end of goroutine")
 			continue
 		}
 		file.Write([]byte(v))

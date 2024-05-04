@@ -2,8 +2,8 @@
     "Hostname": "discord.com",
     "Scheme": "https",
     "MaxPing": 110,
-    "Goroutines": 2,
-    "Scans": 1000,
-    "Maxletency": 410,
+    "Goroutines": 5,
+    "Scans": 6000,
+    "Maxletency": 440,
     "Alpn":["h3", "http/1.1"]
 }
