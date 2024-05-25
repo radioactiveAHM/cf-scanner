@@ -19,6 +19,7 @@ import (
 
 type Conf struct {
 	Hostname   string   `json:"Hostname"`
+	SNI        string   `json:"SNI"`
 	MaxPing    int      `json:"MaxPing"`
 	Goroutines int      `json:"Goroutines"`
 	Scans      int      `json:"Scans"`
@@ -43,6 +44,7 @@ func main() {
 	log.Println("start of app")
 	// input
 	hostname := conf.Hostname
+	sni := conf.SNI
 	maxping := conf.MaxPing
 	goroutines := conf.Goroutines
 	scans := conf.Scans
@@ -56,11 +58,10 @@ func main() {
 			for range scans {
 				// pick an ip
 				file, _ := os.ReadFile("ipv4.txt")
-				ranges := strings.Split(string(file), "\n")
+				ranges := strings.Split(string(file), "\r\n")
 				n4 := strconv.Itoa(rand.Intn(255))
 				selected := ranges[rand.Intn(len(ranges))]
 				ip := selected + n4
-				log.Println(ip + " selected")
 
 				// ping ip
 				pinger, ping_err := probing.NewPinger(ip)
@@ -76,6 +77,8 @@ func main() {
 					log.Println(pinging_err.Error())
 					continue
 				}
+
+				fmt.Printf("%s\t%s\n", ip, pinger.Statistics().MinRtt)
 
 				if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(maxping)*time.Millisecond) {
 					continue
@@ -94,9 +97,9 @@ func main() {
 
 				if conf.Scheme == "https" {
 					tr := &http.Transport{
-						TLSClientConfig: &tls.Config{ServerName: hostname, NextProtos: alpn, MinVersion: tls.VersionTLS13},
-						WriteBufferSize: 8192,
-						ReadBufferSize:  8192,
+						TLSClientConfig: &tls.Config{ServerName: sni, NextProtos: alpn, MinVersion: tls.VersionTLS13},
+						WriteBufferSize: 16384,
+						ReadBufferSize:  32768,
 					}
 					client = &http.Client{Transport: tr}
 				} else {
@@ -119,7 +122,7 @@ func main() {
 
 				println(respone.StatusCode)
 				if respone.StatusCode == 200 {
-					rep := fmt.Sprintf("%s %s %d\n", ip, pinger.Statistics().MinRtt, latency)
+					rep := fmt.Sprintf("%s\t%s\t%d\n", ip, pinger.Statistics().MinRtt, latency)
 					color.Cyan("%s", rep)
 					ch <- rep
 				}

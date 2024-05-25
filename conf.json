@@ -1,9 +1,10 @@
 {
-    "Hostname": "discord.com",
+    "Hostname": "sub.example.com",
+    "SNI": "example.com",
     "Scheme": "https",
-    "MaxPing": 110,
-    "Goroutines": 5,
+    "MaxPing": 115,
+    "Goroutines": 1,
     "Scans": 6000,
-    "Maxletency": 440,
+    "Maxletency": 400,
     "Alpn":["h3", "http/1.1"]
 }
