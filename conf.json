@@ -1,10 +1,17 @@
 {
-    "Hostname": "sub.example.com",
-    "SNI": "example.com",
-    "Scheme": "https",
-    "MaxPing": 115,
-    "Goroutines": 1,
-    "Scans": 6000,
-    "Maxletency": 400,
-    "Alpn":["h3", "http/1.1"]
+	"Hostname": "sub.example.com",
+	"Path": "/test",
+	"headers": {
+		"User-Agent": ["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0)"],
+		"Accept": ["*/*"],
+		"Accept-Language": ["en-US,en;q=0.5"],
+		"Accept-Encoding": ["gzip", "deflate", "br", "zstd"]
+	},
+	"SNI": "example.com",
+	"Scheme": "https",
+	"MaxPing": 150,
+	"Goroutines": 1,
+	"Scans": 6000,
+	"Maxletency": 500,
+	"Alpn": ["http/1.1"]
 }

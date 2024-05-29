@@ -18,14 +18,16 @@ import (
 )
 
 type Conf struct {
-	Hostname   string   `json:"Hostname"`
-	SNI        string   `json:"SNI"`
-	MaxPing    int      `json:"MaxPing"`
-	Goroutines int      `json:"Goroutines"`
-	Scans      int      `json:"Scans"`
-	Maxletency int64    `json:"Maxletency"`
-	Scheme     string   `json:"Scheme"`
-	Alpn       []string `json:"Alpn"`
+	Hostname   string              `json:"Hostname"`
+	Path       string              `json:"Path"`
+	Headers    map[string][]string `json:"Headers"`
+	SNI        string              `json:"SNI"`
+	MaxPing    int                 `json:"MaxPing"`
+	Goroutines int                 `json:"Goroutines"`
+	Scans      int                 `json:"Scans"`
+	Maxletency int64               `json:"Maxletency"`
+	Scheme     string              `json:"Scheme"`
+	Alpn       []string            `json:"Alpn"`
 }
 
 func main() {
@@ -34,7 +36,6 @@ func main() {
 	if cfile_err != nil {
 		log.Fatalln(cfile_err.Error())
 	}
-
 	conf := Conf{}
 	conf_err := json.Unmarshal(cfile, &conf)
 	if conf_err != nil {
@@ -42,8 +43,11 @@ func main() {
 	}
 
 	log.Println("start of app")
-	// input
+
+	// Data from config
 	hostname := conf.Hostname
+	path := conf.Path
+	headers := conf.Headers
 	sni := conf.SNI
 	maxping := conf.MaxPing
 	goroutines := conf.Goroutines
@@ -55,13 +59,20 @@ func main() {
 	ch := make(chan string)
 	for range goroutines {
 		go func() {
+			// Transporter for TLS
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{ServerName: sni, NextProtos: alpn, MinVersion: tls.VersionTLS13},
+				WriteBufferSize: 16384,
+				ReadBufferSize:  32768,
+			}
+			// Load IP list file
+			file, _ := os.ReadFile("ipv4.txt")
 			for range scans {
 				// pick an ip
-				file, _ := os.ReadFile("ipv4.txt")
-				ranges := strings.Split(string(file), "\r\n")
+				ranges := strings.Split(string(file), "\n")
 				n4 := strconv.Itoa(rand.Intn(255))
-				selected := ranges[rand.Intn(len(ranges))]
-				ip := selected + n4
+				ip_parts := strings.Split(strings.TrimSpace(ranges[rand.Intn(len(ranges))]), ".")
+				ip := fmt.Sprintf("%s.%s.%s.%s", ip_parts[0], ip_parts[1], ip_parts[2], n4)
 
 				// ping ip
 				pinger, ping_err := probing.NewPinger(ip)
@@ -85,22 +96,11 @@ func main() {
 				}
 
 				// generate http req
-				req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: ip, Path: "/"}, Host: hostname}
-				req.Header = map[string][]string{
-					"User-Agent":      {"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0)"},
-					"Accept":          {"*/*"},
-					"Accept-Language": {"en-US,en;q=0.5"},
-					"Accept-Encoding": {"gzip", "deflate", "br", "zstd"},
-				}
+				req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: ip, Path: path}, Host: hostname}
+				req.Header = headers
 
 				var client *http.Client
-
 				if conf.Scheme == "https" {
-					tr := &http.Transport{
-						TLSClientConfig: &tls.Config{ServerName: sni, NextProtos: alpn, MinVersion: tls.VersionTLS13},
-						WriteBufferSize: 16384,
-						ReadBufferSize:  32768,
-					}
 					client = &http.Client{Transport: tr}
 				} else {
 					client = http.DefaultClient
@@ -116,12 +116,8 @@ func main() {
 					color.Red("%s", http_err.Error())
 					continue
 				}
-				if respone.Header.Get("Server") != "cloudflare" {
-					continue
-				}
 
-				println(respone.StatusCode)
-				if respone.StatusCode == 200 {
+				if respone.StatusCode == 200 && respone.Header.Get("Server") == "cloudflare" {
 					rep := fmt.Sprintf("%s\t%s\t%d\n", ip, pinger.Statistics().MinRtt, latency)
 					color.Cyan("%s", rep)
 					ch <- rep
