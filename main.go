@@ -28,6 +28,7 @@ type Conf struct {
 	Maxletency int64               `json:"Maxletency"`
 	Scheme     string              `json:"Scheme"`
 	Alpn       []string            `json:"Alpn"`
+	IplistPath string              `json:"IplistPath"`
 }
 
 func main() {
@@ -55,6 +56,7 @@ func main() {
 	var maxletency int64 = conf.Maxletency
 	scheme := conf.Scheme
 	alpn := conf.Alpn
+	iplistpath := conf.IplistPath
 
 	ch := make(chan string)
 	for range goroutines {
@@ -66,7 +68,7 @@ func main() {
 				ReadBufferSize:  32768,
 			}
 			// Load IP list file
-			file, _ := os.ReadFile("ipv4.txt")
+			file, _ := os.ReadFile(iplistpath)
 			for range scans {
 				// pick an ip
 				ranges := strings.Split(string(file), "\n")
@@ -128,6 +130,8 @@ func main() {
 	}
 
 	file, _ := os.OpenFile("result.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	defer file.Close()
+
 	deadgoroutines := 0
 	for {
 		if deadgoroutines == goroutines {

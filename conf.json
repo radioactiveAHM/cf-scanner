@@ -13,5 +13,6 @@
 	"Goroutines": 1,
 	"Scans": 6000,
 	"Maxletency": 500,
-	"Alpn": ["http/1.1"]
+	"Alpn": ["http/1.1"],
+	"IplistPath":"ipv4.txt"
 }
