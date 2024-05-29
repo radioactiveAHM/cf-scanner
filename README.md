@@ -1,5 +1,7 @@
 # cf-scanner
 
+["فارسی"]("/README_fa.md")
+
 Cloudflare IP scanner
 
 ## Build
