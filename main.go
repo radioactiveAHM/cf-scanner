@@ -28,6 +28,7 @@ type Conf struct {
 	Maxletency int64               `json:"Maxletency"`
 	Scheme     string              `json:"Scheme"`
 	Alpn       []string            `json:"Alpn"`
+	IpVersion  string              `json:"IpVersion"`
 	IplistPath string              `json:"IplistPath"`
 }
 
@@ -56,6 +57,7 @@ func main() {
 	var maxletency int64 = conf.Maxletency
 	scheme := conf.Scheme
 	alpn := conf.Alpn
+	ipversion := conf.IpVersion
 	iplistpath := conf.IplistPath
 
 	ch := make(chan string)
@@ -71,10 +73,24 @@ func main() {
 			file, _ := os.ReadFile(iplistpath)
 			for range scans {
 				// pick an ip
-				ranges := strings.Split(string(file), "\n")
-				n4 := strconv.Itoa(rand.Intn(255))
-				ip_parts := strings.Split(strings.TrimSpace(ranges[rand.Intn(len(ranges))]), ".")
-				ip := fmt.Sprintf("%s.%s.%s.%s", ip_parts[0], ip_parts[1], ip_parts[2], n4)
+				ip := ""
+				if ipversion == "v4" {
+					ranges := strings.Split(string(file), "\n")
+					n4 := strconv.Itoa(rand.Intn(255))
+					ip_parts := strings.Split(strings.TrimSpace(ranges[rand.Intn(len(ranges))]), ".")
+					ip = fmt.Sprintf("%s.%s.%s.%s", ip_parts[0], ip_parts[1], ip_parts[2], n4)
+				} else if ipversion == "v6" {
+					ops := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f", ""}
+					n1 := rand.Intn(len(ops))
+					n2 := rand.Intn(len(ops))
+					n3 := rand.Intn(len(ops))
+					n4 := rand.Intn(len(ops))
+					ranges := strings.Split(string(file), "\n")
+					selected := strings.TrimSpace(ranges[rand.Intn(len(ranges))])
+					ip = "[" + selected + ops[n1] + ops[n2] + ops[n3] + ops[n4] + "]"
+				} else {
+					log.Fatalf("Invalid IP version")
+				}
 
 				// ping ip
 				pinger, ping_err := probing.NewPinger(ip)
