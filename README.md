@@ -2,6 +2,8 @@
 
 ["فارسی"](/README_fa.md)
 
+["اموزش فارسی"](/tutorial/FA.md)
+
 Cloudflare IP scanner
 
 ## Build
