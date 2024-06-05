@@ -26,6 +26,7 @@ type Conf struct {
 	Goroutines int                 `json:"Goroutines"`
 	Scans      int                 `json:"Scans"`
 	Maxletency int64               `json:"Maxletency"`
+	Jitter     bool                `json:"Jitter"`
 	Scheme     string              `json:"Scheme"`
 	Alpn       []string            `json:"Alpn"`
 	IpVersion  string              `json:"IpVersion"`
@@ -59,6 +60,7 @@ func main() {
 	alpn := conf.Alpn
 	ipversion := conf.IpVersion
 	iplistpath := conf.IplistPath
+	cjitter := conf.Jitter
 
 	ch := make(chan string)
 	for range goroutines {
@@ -136,7 +138,24 @@ func main() {
 				}
 
 				if respone.StatusCode == 200 && respone.Header.Get("Server") == "cloudflare" {
-					rep := fmt.Sprintf("%s\t%s\t%d\n", ip, pinger.Statistics().MinRtt, latency)
+					// Calc jiiter
+					jitter_str := ""
+					if cjitter {
+						latencies := []float64{}
+						for range 5 {
+							s := time.Now()
+							// send request
+							_, http_err := client.Do(&req)
+							e := time.Now()
+							latency := e.UnixMilli() - s.UnixMilli()
+							if http_err != nil {
+								continue
+							}
+							latencies = append(latencies, float64(latency))
+						}
+						jitter_str = fmt.Sprintf("\t%f", Calc_jitter(latencies))
+					}
+					rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, pinger.Statistics().MinRtt, latency, jitter_str)
 					color.Cyan("%s", rep)
 					ch <- rep
 				}
