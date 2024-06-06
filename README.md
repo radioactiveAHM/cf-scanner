@@ -27,5 +27,7 @@ To build stripped run `go build -ldflags "-w -s"` in project directory
 * Goroutines: Number of concurrent goroutines for scanning. Here, it’s set to 1.
 * Scans: Total number of scans to perform. The example specifies 6000.
 * Maxletency: Maximum acceptable latency (in milliseconds). Set to 500.
+* Jitter: Enable calculate jitter.
+* MaxJitter: Acceptable jitter.
 * Alpn: List of supported ALPN (Application-Layer Protocol Negotiation) protocols. In this case, it’s ["http/1.1"].
 * IplistPath: Path to the file containing a list of IP addresses. For instance, "ipv4.txt".

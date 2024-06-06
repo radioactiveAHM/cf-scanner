@@ -10,10 +10,11 @@
 	"SNI": "example.com",
 	"Scheme": "https",
 	"MaxPing": 200,
-	"Goroutines": 1,
+	"Goroutines": 2,
 	"Scans": 6000,
-	"Maxletency": 550,
+	"Maxletency": 600,
 	"Jitter": true,
+	"MaxJitter": 20,
 	"Alpn": ["h3", "spdy/3.1", "http/1.1"],
 	"IpVersion": "v4",
 	"IplistPath":"ipv4.txt"

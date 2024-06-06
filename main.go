@@ -27,6 +27,7 @@ type Conf struct {
 	Scans      int                 `json:"Scans"`
 	Maxletency int64               `json:"Maxletency"`
 	Jitter     bool                `json:"Jitter"`
+	MaxJitter  float64             `json:"MaxJitter"`
 	Scheme     string              `json:"Scheme"`
 	Alpn       []string            `json:"Alpn"`
 	IpVersion  string              `json:"IpVersion"`
@@ -61,6 +62,7 @@ func main() {
 	ipversion := conf.IpVersion
 	iplistpath := conf.IplistPath
 	cjitter := conf.Jitter
+	maxjitter := conf.MaxJitter
 
 	ch := make(chan string)
 	for range goroutines {
@@ -149,11 +151,17 @@ func main() {
 							e := time.Now()
 							latency := e.UnixMilli() - s.UnixMilli()
 							if http_err != nil {
+								latencies = append(latencies, 999)
 								continue
 							}
 							latencies = append(latencies, float64(latency))
 						}
-						jitter_str = fmt.Sprintf("\t%f", Calc_jitter(latencies))
+						jitter := Calc_jitter(latencies)
+						if jitter > maxjitter {
+							color.Yellow("%s\t%s\t%d\t%f\n", ip, pinger.Statistics().MinRtt, latency, jitter)
+							continue
+						}
+						jitter_str = fmt.Sprintf("\t%f", jitter)
 					}
 					rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, pinger.Statistics().MinRtt, latency, jitter_str)
 					color.Cyan("%s", rep)
