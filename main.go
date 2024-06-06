@@ -139,7 +139,7 @@ func main() {
 					continue
 				}
 
-				if respone.StatusCode == 200 && respone.Header.Get("Server") == "cloudflare" {
+				if (respone.StatusCode == 200 || respone.StatusCode == 204) && respone.Header.Get("Server") == "cloudflare" {
 					// Calc jiiter
 					jitter_str := ""
 					if cjitter {
@@ -151,10 +151,12 @@ func main() {
 							e := time.Now()
 							latency := e.UnixMilli() - s.UnixMilli()
 							if http_err != nil {
-								latencies = append(latencies, 999)
 								continue
 							}
 							latencies = append(latencies, float64(latency))
+						}
+						if len(latencies) == 0 {
+							continue
 						}
 						jitter := Calc_jitter(latencies)
 						if jitter > maxjitter {
