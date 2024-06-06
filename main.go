@@ -73,9 +73,9 @@ func main() {
 			}
 			// Load IP list file
 			file, _ := os.ReadFile(iplistpath)
+			ip := ""
 			for range scans {
 				// pick an ip
-				ip := ""
 				if ipversion == "v4" {
 					ranges := strings.Split(string(file), "\n")
 					n4 := strconv.Itoa(rand.Intn(255))
