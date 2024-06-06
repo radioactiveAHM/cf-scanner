@@ -70,8 +70,6 @@ func main() {
 			// Transporter for TLS
 			tr := &http.Transport{
 				TLSClientConfig: &tls.Config{ServerName: sni, NextProtos: alpn, MinVersion: tls.VersionTLS13},
-				WriteBufferSize: 16384,
-				ReadBufferSize:  32768,
 			}
 			// Load IP list file
 			file, _ := os.ReadFile(iplistpath)
