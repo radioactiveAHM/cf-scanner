@@ -166,6 +166,8 @@ func main() {
 					rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, pinger.Statistics().MinRtt, latency, jitter_str)
 					color.Cyan("%s", rep)
 					ch <- rep
+				} else {
+					fmt.Printf("%s\t%s\tHTTP.StatusCode=%d\n", ip, pinger.Statistics().MinRtt, respone.StatusCode)
 				}
 			}
 			ch <- "end"
