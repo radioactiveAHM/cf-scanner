@@ -142,6 +142,7 @@ func main() {
 					jitter_str := ""
 					if cjitter {
 						latencies := []float64{}
+						jammed := false
 						for range 5 {
 							s := time.Now()
 							// send request
@@ -149,11 +150,13 @@ func main() {
 							e := time.Now()
 							latency := e.UnixMilli() - s.UnixMilli()
 							if http_err != nil {
-								continue
+								jammed = true
+								break
 							}
 							latencies = append(latencies, float64(latency))
 						}
-						if len(latencies) == 0 {
+						if jammed {
+							color.Red("%s\t%s\t%d\tJAMMED\n", ip, pinger.Statistics().MinRtt, latency)
 							continue
 						}
 						jitter := Calc_jitter(latencies)
