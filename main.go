@@ -18,20 +18,21 @@ import (
 )
 
 type Conf struct {
-	Hostname   string              `json:"Hostname"`
-	Path       string              `json:"Path"`
-	Headers    map[string][]string `json:"Headers"`
-	SNI        string              `json:"SNI"`
-	MaxPing    int                 `json:"MaxPing"`
-	Goroutines int                 `json:"Goroutines"`
-	Scans      int                 `json:"Scans"`
-	Maxletency int64               `json:"Maxletency"`
-	Jitter     bool                `json:"Jitter"`
-	MaxJitter  float64             `json:"MaxJitter"`
-	Scheme     string              `json:"Scheme"`
-	Alpn       []string            `json:"Alpn"`
-	IpVersion  string              `json:"IpVersion"`
-	IplistPath string              `json:"IplistPath"`
+	Hostname       string              `json:"Hostname"`
+	Path           string              `json:"Path"`
+	Headers        map[string][]string `json:"Headers"`
+	ResponseHeader map[string]string   `json:"ResponseHeader"`
+	SNI            string              `json:"SNI"`
+	MaxPing        int                 `json:"MaxPing"`
+	Goroutines     int                 `json:"Goroutines"`
+	Scans          int                 `json:"Scans"`
+	Maxletency     int64               `json:"Maxletency"`
+	Jitter         bool                `json:"Jitter"`
+	MaxJitter      float64             `json:"MaxJitter"`
+	Scheme         string              `json:"Scheme"`
+	Alpn           []string            `json:"Alpn"`
+	IpVersion      string              `json:"IpVersion"`
+	IplistPath     string              `json:"IplistPath"`
 }
 
 func main() {
@@ -63,6 +64,7 @@ func main() {
 	iplistpath := conf.IplistPath
 	cjitter := conf.Jitter
 	maxjitter := conf.MaxJitter
+	respheaders := conf.ResponseHeader
 
 	ch := make(chan string)
 	for range goroutines {
@@ -137,7 +139,7 @@ func main() {
 					continue
 				}
 
-				if (respone.StatusCode == 200 || respone.StatusCode == 204) && respone.Header.Get("Server") == "cloudflare" {
+				if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, respheaders) {
 					// Calc jiiter
 					jitter_str := ""
 					if cjitter {
@@ -196,4 +198,16 @@ func main() {
 		}
 		file.Write([]byte(v))
 	}
+}
+
+func match(headers http.Header, tomatch map[string]string) bool {
+	for header, value := range tomatch {
+		if headers.Get(header) == value {
+			continue
+		} else {
+			return false
+		}
+	}
+
+	return true
 }
