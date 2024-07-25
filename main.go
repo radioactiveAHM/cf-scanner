@@ -81,7 +81,11 @@ func main() {
 				if ipversion == "v4" {
 					ranges := strings.Split(string(file), "\n")
 					n4 := strconv.Itoa(rand.Intn(255))
-					ip_parts := strings.Split(strings.TrimSpace(ranges[rand.Intn(len(ranges))]), ".")
+					randomRange := ranges[rand.Intn(len(ranges))]
+					if randomRange == "" || randomRange == " " {
+						continue
+					}
+					ip_parts := strings.Split(strings.TrimSpace(randomRange), ".")
 					ip = fmt.Sprintf("%s.%s.%s.%s", ip_parts[0], ip_parts[1], ip_parts[2], n4)
 				} else if ipversion == "v6" {
 					ops := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f", ""}
@@ -90,7 +94,11 @@ func main() {
 					n3 := rand.Intn(len(ops))
 					n4 := rand.Intn(len(ops))
 					ranges := strings.Split(string(file), "\n")
-					selected := strings.TrimSpace(ranges[rand.Intn(len(ranges))])
+					randomRange := ranges[rand.Intn(len(ranges))]
+					if randomRange == "" || randomRange == " " {
+						continue
+					}
+					selected := strings.TrimSpace(randomRange)
 					ip = "[" + selected + ops[n1] + ops[n2] + ops[n3] + ops[n4] + "]"
 				} else {
 					log.Fatalf("Invalid IP version")
@@ -111,9 +119,8 @@ func main() {
 					continue
 				}
 
-				fmt.Printf("%s\t%s\n", ip, pinger.Statistics().MinRtt)
-
 				if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(maxping)*time.Millisecond) {
+					color.Red("%s\t%s\n", ip, pinger.Statistics().MinRtt)
 					continue
 				}
 
@@ -172,7 +179,7 @@ func main() {
 					color.Green("%s", rep)
 					ch <- rep
 				} else {
-					fmt.Printf("%s\t%s\tHTTP.StatusCode=%d\n", ip, pinger.Statistics().MinRtt, respone.StatusCode)
+					color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, pinger.Statistics().MinRtt, respone.StatusCode)
 				}
 			}
 			ch <- "end"
