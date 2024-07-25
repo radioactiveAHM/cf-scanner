@@ -169,7 +169,7 @@ func main() {
 						jitter_str = fmt.Sprintf("\t%f", jitter)
 					}
 					rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, pinger.Statistics().MinRtt, latency, jitter_str)
-					color.Cyan("%s", rep)
+					color.Green("%s", rep)
 					ch <- rep
 				} else {
 					fmt.Printf("%s\t%s\tHTTP.StatusCode=%d\n", ip, pinger.Statistics().MinRtt, respone.StatusCode)
