@@ -33,6 +33,7 @@ type Conf struct {
 	Alpn           []string            `json:"Alpn"`
 	IpVersion      string              `json:"IpVersion"`
 	IplistPath     string              `json:"IplistPath"`
+	IgnoreRange    []string            `json:"IgnoreRange"`
 }
 
 func main() {
@@ -65,6 +66,7 @@ func main() {
 	cjitter := conf.Jitter
 	maxjitter := conf.MaxJitter
 	respheaders := conf.ResponseHeader
+	ignorerange := conf.IgnoreRange
 
 	ch := make(chan string)
 	for range goroutines {
@@ -82,7 +84,7 @@ func main() {
 					ranges := strings.Split(string(file), "\n")
 					n4 := strconv.Itoa(rand.Intn(255))
 					randomRange := ranges[rand.Intn(len(ranges))]
-					if randomRange == "" || randomRange == " " {
+					if randomRange == "" || randomRange == " " || ignore(randomRange, ignorerange) {
 						continue
 					}
 					ip_parts := strings.Split(strings.TrimSpace(randomRange), ".")
@@ -217,4 +219,14 @@ func match(headers http.Header, tomatch map[string]string) bool {
 	}
 
 	return true
+}
+
+func ignore(ip string, ignoringList []string) bool {
+	n1 := strings.Split(ip, ".")[0]
+	for _, ig := range ignoringList {
+		if n1 == ig {
+			return true
+		}
+	}
+	return false
 }
