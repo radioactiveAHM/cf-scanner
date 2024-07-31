@@ -15,6 +15,9 @@ import (
 
 	"github.com/fatih/color"
 	probing "github.com/prometheus-community/pro-bing"
+
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
 )
 
 type Conf struct {
@@ -34,6 +37,7 @@ type Conf struct {
 	IpVersion      string              `json:"IpVersion"`
 	IplistPath     string              `json:"IplistPath"`
 	IgnoreRange    []string            `json:"IgnoreRange"`
+	HTTP3          bool                `json:"HTTP/3"`
 }
 
 func main() {
@@ -67,6 +71,7 @@ func main() {
 	maxjitter := conf.MaxJitter
 	respheaders := conf.ResponseHeader
 	ignorerange := conf.IgnoreRange
+	h3 := conf.HTTP3
 
 	ch := make(chan string)
 	for range goroutines {
@@ -132,7 +137,16 @@ func main() {
 
 				var client *http.Client
 				if conf.Scheme == "https" {
-					client = &http.Client{Transport: tr}
+					if h3 {
+						tconf := tls.Config{ServerName: sni, NextProtos: []string{"h3"}}
+						qconf := quic.Config{}
+						h3wraper := http3.RoundTripper{TLSClientConfig: &tconf, QUICConfig: &qconf}
+						client = &http.Client{
+							Transport: &h3wraper,
+						}
+					} else {
+						client = &http.Client{Transport: tr}
+					}
 				} else {
 					client = http.DefaultClient
 				}
