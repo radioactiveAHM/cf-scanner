@@ -21,6 +21,7 @@ To build stripped run `go build -ldflags "-w -s"` in project directory
   * Accept: Define the accepted content types. Here, it’s set to "*/*".
   * Accept-Language: Specify the preferred language for content. In this case, "en-US,en;q=0.5".
   * Accept-Encoding: Set the accepted encodings (e.g., "gzip", "deflate", "br", "zstd").
+* ResponseHeader: Headers that an HTTP response must include.
 * SNI (Server Name Indication): The SNI value to use during TLS handshake. For example, "example.com".
 * Scheme: The protocol scheme ("http" or "https"). In this case, it’s "https".
 * MaxPing: Maximum acceptable ping time (in milliseconds). Set to 150 in the provided configuration.
@@ -30,4 +31,7 @@ To build stripped run `go build -ldflags "-w -s"` in project directory
 * Jitter: Enable calculate jitter.
 * MaxJitter: Acceptable jitter.
 * Alpn: List of supported ALPN (Application-Layer Protocol Negotiation) protocols. In this case, it’s ["http/1.1"].
+* IpVersion: IP verion (v4 or v6).
 * IplistPath: Path to the file containing a list of IP addresses. For instance, "ipv4.txt".
+* IgnoreRange: A list of octet, where each IP matches the first octet will be ignored.
+* HTTP/3: Use HTTP version 3 or not.
