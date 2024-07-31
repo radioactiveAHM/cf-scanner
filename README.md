@@ -8,9 +8,9 @@ Cloudflare IP scanner
 
 ## Build
 
-To build run `go build` in project directory
+To build run `go mod tidy` then `go build` in project directory
 
-To build stripped run `go build -ldflags "-w -s"` in project directory
+To build stripped run `go mod tidy` then `go build -ldflags "-w -s"` in project directory
 
 ## Configuration Parameters
 
