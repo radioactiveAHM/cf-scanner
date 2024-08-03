@@ -1,11 +1,11 @@
 module github.com/radioactiveAHM/cfscanner
 
-go 1.22.4
+go 1.22.5
 
 require (
 	github.com/fatih/color v1.17.0
 	github.com/prometheus-community/pro-bing v0.4.1
-	github.com/quic-go/quic-go v0.45.1
+	github.com/quic-go/quic-go v0.45.2
 )
 
 require (

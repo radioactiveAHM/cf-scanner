@@ -22,5 +22,6 @@
 	"IpVersion": "v4",
 	"IplistPath":"ipv4.txt",
 	"IgnoreRange": ["104", "172"],
-	"HTTP/3": false
+	"HTTP/3": false,
+	"Method": "linear"
 }
