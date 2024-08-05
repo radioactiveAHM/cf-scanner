@@ -26,6 +26,7 @@ type Conf struct {
 	Headers        map[string][]string `json:"Headers"`
 	ResponseHeader map[string]string   `json:"ResponseHeader"`
 	SNI            string              `json:"SNI"`
+	Insecure       bool                `json:"Insecure"`
 	MaxPing        int                 `json:"MaxPing"`
 	Goroutines     int                 `json:"Goroutines"`
 	Scans          int                 `json:"Scans"`
@@ -74,15 +75,15 @@ func main() {
 	ignorerange := conf.IgnoreRange
 	h3 := conf.HTTP3
 	method := conf.Method
+	insecure := conf.Insecure
 
 	if method == "random" {
 		ch := make(chan string)
 		for range goroutines {
 			go func() {
 				// Transporter for TLS
-				tr := &http.Transport{
-					TLSClientConfig: &tls.Config{ServerName: sni, NextProtos: alpn, MinVersion: tls.VersionTLS13},
-				}
+				tr := ctls(insecure, sni, alpn)
+
 				// Load IP list file
 				file, _ := os.ReadFile(iplistpath)
 				ip := ""
@@ -148,7 +149,7 @@ func main() {
 								Transport: &h3wraper,
 							}
 						} else {
-							client = &http.Client{Transport: tr}
+							client = &http.Client{Transport: &tr}
 						}
 					} else {
 						client = http.DefaultClient
@@ -232,9 +233,7 @@ func main() {
 		for range goroutines {
 			go func() {
 				// Transporter for TLS
-				tr := &http.Transport{
-					TLSClientConfig: &tls.Config{ServerName: sni, NextProtos: alpn, MinVersion: tls.VersionTLS13},
-				}
+				tr := ctls(insecure, sni, alpn)
 				for {
 					ip := <-ip_ch
 					// ping ip
@@ -271,7 +270,7 @@ func main() {
 								Transport: &h3wraper,
 							}
 						} else {
-							client = &http.Client{Transport: tr}
+							client = &http.Client{Transport: &tr}
 						}
 					} else {
 						client = http.DefaultClient
@@ -370,4 +369,11 @@ func ignore(ip string, ignoringList []string) bool {
 		}
 	}
 	return false
+}
+
+func ctls(insecure bool, sni string, alpn []string) http.Transport {
+	if insecure {
+		return (http.Transport{TLSClientConfig: &tls.Config{ServerName: sni, NextProtos: alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: true}})
+	}
+	return (http.Transport{TLSClientConfig: &tls.Config{ServerName: sni, NextProtos: alpn, MinVersion: tls.VersionTLS13}})
 }

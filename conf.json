@@ -11,6 +11,7 @@
 		"Server": "cloudflare"
 	},
 	"SNI": "cp.cloudflare.com",
+	"Insecure": false,
 	"Scheme": "https",
 	"MaxPing": 200,
 	"Goroutines": 2,
