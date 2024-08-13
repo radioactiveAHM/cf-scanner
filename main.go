@@ -309,6 +309,9 @@ func main() {
 									break
 								}
 								latencies = append(latencies, float64(latency))
+								if jitterInterval > 0 {
+									time.Sleep(time.Second * time.Duration(jitterInterval))
+								}
 							}
 							if jammed {
 								color.Red("%s\t%s\t%d\tJAMMED\n", ip, pinger.Statistics().MinRtt, latency)
