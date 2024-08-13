@@ -33,6 +33,7 @@ type Conf struct {
 	Maxletency     int64               `json:"Maxletency"`
 	Jitter         bool                `json:"Jitter"`
 	MaxJitter      float64             `json:"MaxJitter"`
+	JitterInterval int                 `json:"JitterInterval"`
 	Scheme         string              `json:"Scheme"`
 	Alpn           []string            `json:"Alpn"`
 	IpVersion      string              `json:"IpVersion"`
@@ -71,6 +72,7 @@ func main() {
 	iplistpath := conf.IplistPath
 	cjitter := conf.Jitter
 	maxjitter := conf.MaxJitter
+	jitterInterval := conf.JitterInterval
 	respheaders := conf.ResponseHeader
 	ignorerange := conf.IgnoreRange
 	h3 := conf.HTTP3
@@ -183,6 +185,7 @@ func main() {
 									break
 								}
 								latencies = append(latencies, float64(latency))
+								time.Sleep(time.Second * time.Duration(jitterInterval))
 							}
 							if jammed {
 								color.Red("%s\t%s\t%d\tJAMMED\n", ip, pinger.Statistics().MinRtt, latency)
