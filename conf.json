@@ -19,7 +19,7 @@
 	"Maxletency": 600,
 	"Jitter": true,
 	"MaxJitter": 20,
-	"JitterInterval": 5,
+	"JitterInterval": 1,
 	"Alpn": ["h3", "spdy/3.1", "http/1.1"],
 	"IpVersion": "v4",
 	"IplistPath":"ipv4.txt",
