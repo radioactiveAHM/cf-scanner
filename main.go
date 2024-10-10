@@ -102,17 +102,13 @@ func main() {
 						ip = fmt.Sprintf("%s.%s.%s.%s", ip_parts[0], ip_parts[1], ip_parts[2], n4)
 					} else if ipversion == "v6" {
 						ops := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f", ""}
-						n1 := rand.Intn(len(ops))
-						n2 := rand.Intn(len(ops))
-						n3 := rand.Intn(len(ops))
-						n4 := rand.Intn(len(ops))
 						ranges := strings.Split(string(file), "\n")
 						randomRange := ranges[rand.Intn(len(ranges))]
 						if randomRange == "" || randomRange == " " {
 							continue
 						}
 						selected := strings.TrimSpace(randomRange)
-						ip = "[" + selected + ops[n1] + ops[n2] + ops[n3] + ops[n4] + "]"
+						ip = "[" + selected + ops[rand.Intn(len(ops))] + ops[rand.Intn(len(ops))] + ops[rand.Intn(len(ops))] + ops[rand.Intn(len(ops))] + "]"
 					} else {
 						log.Fatalf("Invalid IP version")
 					}
