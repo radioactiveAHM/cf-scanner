@@ -5,7 +5,7 @@ go 1.23.2
 require (
 	github.com/fatih/color v1.17.0
 	github.com/prometheus-community/pro-bing v0.4.1
-	github.com/quic-go/quic-go v0.47.0
+	github.com/quic-go/quic-go v0.48.0
 )
 
 require (
