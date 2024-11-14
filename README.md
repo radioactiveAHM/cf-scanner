@@ -31,7 +31,7 @@ To build stripped run `go mod tidy` then `go build -ldflags "-w -s"` in project 
 * Maxletency: Maximum acceptable latency (in milliseconds). Set to 500.
 * Jitter: Enable calculate jitter.
 * MaxJitter: Acceptable jitter.
-* JitterInterval: Sleep time interval between jitter calculations in seconds.
+* JitterInterval: Sleep time interval between jitter calculations in milliseconds.
 * Alpn: List of supported ALPN (Application-Layer Protocol Negotiation) protocols. In this case, it’s ["http/1.1"].
 * IpVersion: IP verion (v4 or v6).
 * IplistPath: Path to the file containing a list of IP addresses. For instance, "ipv4.txt".

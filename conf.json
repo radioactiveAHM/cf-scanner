@@ -3,7 +3,7 @@
 	"Path": "/",
 	"Headers": {
 		"User-Agent": ["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0)"],
-		"Accept-Encoding": ["gzip" ,"br"]
+		"Accept-Encoding": ["gzip", "br"]
 	},
 	"ResponseHeader": {
 		"Server": "cloudflare"
@@ -17,10 +17,10 @@
 	"Maxletency": 600,
 	"Jitter": true,
 	"MaxJitter": 20,
-	"JitterInterval": 1,
+	"JitterInterval": 200,
 	"Alpn": ["h3", "spdy/3.1", "http/1.1"],
 	"IpVersion": "v4",
-	"IplistPath":"ipv4.txt",
+	"IplistPath": "ipv4.txt",
 	"IgnoreRange": ["104", "172"],
 	"HTTP/3": false,
 	"Method": "random"

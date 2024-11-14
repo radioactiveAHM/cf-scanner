@@ -182,7 +182,7 @@ func main() {
 								}
 								latencies = append(latencies, float64(latency))
 								if jitterInterval > 0 {
-									time.Sleep(time.Second * time.Duration(jitterInterval))
+									time.Sleep(time.Millisecond * time.Duration(jitterInterval))
 								}
 							}
 							if jammed {
@@ -306,7 +306,7 @@ func main() {
 								}
 								latencies = append(latencies, float64(latency))
 								if jitterInterval > 0 {
-									time.Sleep(time.Second * time.Duration(jitterInterval))
+									time.Sleep(time.Millisecond * time.Duration(jitterInterval))
 								}
 							}
 							if jammed {
