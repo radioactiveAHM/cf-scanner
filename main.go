@@ -118,18 +118,18 @@ func main() {
 					pinger.SetPrivileged(true)
 					pinger.Timeout = time.Duration(maxping) * time.Millisecond
 					if ping_err != nil {
-						log.Println(ping_err.Error())
+						log.Println("PING: " + ping_err.Error())
 						continue
 					}
 					pinger.Count = 1
 					pinging_err := pinger.Run()
 					if pinging_err != nil {
-						log.Println(pinging_err.Error())
+						log.Println("PING: " + pinging_err.Error())
 						continue
 					}
 
 					if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(maxping)*time.Millisecond) {
-						color.Red("%s\t%s\n", ip, pinger.Statistics().MinRtt)
+						color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
 						continue
 					}
 
@@ -242,18 +242,18 @@ func main() {
 					pinger.SetPrivileged(true)
 					pinger.Timeout = time.Duration(maxping) * time.Millisecond
 					if ping_err != nil {
-						log.Println(ping_err.Error())
+						log.Println("PING: " + ping_err.Error())
 						continue
 					}
 					pinger.Count = 1
 					pinging_err := pinger.Run()
 					if pinging_err != nil {
-						log.Println(pinging_err.Error())
+						log.Println("PING: " + pinging_err.Error())
 						continue
 					}
 
 					if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(maxping)*time.Millisecond) {
-						color.Red("%s\t%s\n", ip, pinger.Statistics().MinRtt)
+						color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
 						continue
 					}
 
