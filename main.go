@@ -140,7 +140,7 @@ func main() {
 					var client *http.Client
 					if conf.Scheme == "https" {
 						if h3 {
-							tconf := tls.Config{ServerName: sni, NextProtos: []string{"h3"}}
+							tconf := tls.Config{ServerName: sni, NextProtos: []string{"h3"}, InsecureSkipVerify: insecure}
 							qconf := quic.Config{}
 							h3wraper := http3.RoundTripper{TLSClientConfig: &tconf, QUICConfig: &qconf}
 							client = &http.Client{
@@ -264,7 +264,7 @@ func main() {
 					var client *http.Client
 					if conf.Scheme == "https" {
 						if h3 {
-							tconf := tls.Config{ServerName: sni, NextProtos: []string{"h3"}}
+							tconf := tls.Config{ServerName: sni, NextProtos: []string{"h3"}, InsecureSkipVerify: insecure}
 							qconf := quic.Config{}
 							h3wraper := http3.RoundTripper{TLSClientConfig: &tconf, QUICConfig: &qconf}
 							client = &http.Client{
