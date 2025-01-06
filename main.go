@@ -31,7 +31,7 @@ type Conf struct {
 	MaxPing        int                 `json:"MaxPing"`
 	Goroutines     int                 `json:"Goroutines"`
 	Scans          int                 `json:"Scans"`
-	Maxletency     int64               `json:"Maxletency"`
+	Maxlatency     int64               `json:"Maxlatency"`
 	Jitter         bool                `json:"Jitter"`
 	MaxJitter      float64             `json:"MaxJitter"`
 	JitterInterval int64               `json:"JitterInterval"`
@@ -42,6 +42,7 @@ type Conf struct {
 	IgnoreRange    []string            `json:"IgnoreRange"`
 	HTTP3          bool                `json:"HTTP/3"`
 	Method         string              `json:"Method"`
+	Upload         bool                `json:"Upload"`
 }
 
 func main() {
@@ -58,51 +59,28 @@ func main() {
 
 	log.Println("start of app")
 
-	// Data from config
-	hostname := conf.Hostname
-	path := conf.Path
-	headers := conf.Headers
-	sni := conf.SNI
-	ping := conf.Ping
-	maxping := conf.MaxPing
-	goroutines := conf.Goroutines
-	scans := conf.Scans
-	var maxletency int64 = conf.Maxletency
-	scheme := conf.Scheme
-	alpn := conf.Alpn
-	ipversion := conf.IpVersion
-	iplistpath := conf.IplistPath
-	cjitter := conf.Jitter
-	maxjitter := conf.MaxJitter
-	jitterInterval := conf.JitterInterval
-	respheaders := conf.ResponseHeader
-	ignorerange := conf.IgnoreRange
-	h3 := conf.HTTP3
-	method := conf.Method
-	insecure := conf.Insecure
-
-	if method == "random" {
+	if conf.Method == "random" {
 		ch := make(chan string)
-		for range goroutines {
+		for range conf.Goroutines {
 			go func() {
 				// Transporter for TLS
-				tr := ctls(insecure, sni, alpn)
+				tr := ctls(conf.Insecure, conf.SNI, conf.Alpn)
 
 				// Load IP list file
-				file, _ := os.ReadFile(iplistpath)
+				file, _ := os.ReadFile(conf.IplistPath)
 				ip := ""
-				for range scans {
+				for range conf.Scans {
 					// pick an ip
-					if ipversion == "v4" {
+					if conf.IpVersion == "v4" {
 						ranges := strings.Split(string(file), "\n")
 						n4 := strconv.Itoa(rand.Intn(255))
 						randomRange := ranges[rand.Intn(len(ranges))]
-						if randomRange == "" || randomRange == " " || ignore(randomRange, ignorerange) {
+						if randomRange == "" || randomRange == " " || ignore(randomRange, conf.IgnoreRange) {
 							continue
 						}
 						ip_parts := strings.Split(strings.TrimSpace(randomRange), ".")
 						ip = fmt.Sprintf("%s.%s.%s.%s", ip_parts[0], ip_parts[1], ip_parts[2], n4)
-					} else if ipversion == "v6" {
+					} else if conf.IpVersion == "v6" {
 						ops := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f", ""}
 						ranges := strings.Split(string(file), "\n")
 						randomRange := ranges[rand.Intn(len(ranges))]
@@ -116,11 +94,11 @@ func main() {
 					}
 
 					minrtt := time.Millisecond
-					if ping {
+					if conf.Ping {
 						// ping ip
 						pinger, ping_err := probing.NewPinger(ip)
 						pinger.SetPrivileged(true)
-						pinger.Timeout = time.Duration(maxping) * time.Millisecond
+						pinger.Timeout = time.Duration(conf.MaxPing) * time.Millisecond
 						if ping_err != nil {
 							log.Println("PING: " + ping_err.Error())
 							continue
@@ -132,7 +110,7 @@ func main() {
 							continue
 						}
 
-						if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(maxping)*time.Millisecond) {
+						if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.MaxPing)*time.Millisecond) {
 							color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
 							continue
 						}
@@ -141,13 +119,13 @@ func main() {
 					}
 
 					// generate http req
-					req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: ip, Path: path}, Host: hostname}
-					req.Header = headers
+					req := http.Request{Method: "GET", URL: &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
+					req.Header = conf.Headers
 
 					var client *http.Client
 					if conf.Scheme == "https" {
-						if h3 {
-							tconf := tls.Config{ServerName: sni, NextProtos: []string{"h3"}, InsecureSkipVerify: insecure}
+						if conf.HTTP3 {
+							tconf := tls.Config{ServerName: conf.SNI, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
 							qconf := quic.Config{}
 							h3wraper := http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
 							client = &http.Client{
@@ -160,7 +138,7 @@ func main() {
 						client = http.DefaultClient
 					}
 
-					client.Timeout = time.Millisecond * time.Duration(maxletency)
+					client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
 					s := time.Now()
 					// send request
 					respone, http_err := client.Do(&req)
@@ -171,10 +149,10 @@ func main() {
 						continue
 					}
 
-					if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, respheaders) {
+					if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, conf.ResponseHeader) {
 						// Calc jiiter
 						jitter_str := ""
-						if cjitter {
+						if conf.Jitter {
 							latencies := []float64{}
 							jammed := false
 							for range 5 {
@@ -188,8 +166,8 @@ func main() {
 									break
 								}
 								latencies = append(latencies, float64(latency))
-								if jitterInterval > 0 {
-									time.Sleep(time.Millisecond * time.Duration(jitterInterval))
+								if conf.JitterInterval > 0 {
+									time.Sleep(time.Millisecond * time.Duration(conf.JitterInterval))
 								}
 							}
 							if jammed {
@@ -197,7 +175,7 @@ func main() {
 								continue
 							}
 							jitter := Calc_jitter(latencies)
-							if jitter > maxjitter {
+							if jitter > conf.MaxJitter {
 								color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
 								continue
 							}
@@ -219,7 +197,7 @@ func main() {
 
 		deadgoroutines := 0
 		for {
-			if deadgoroutines == goroutines {
+			if deadgoroutines == conf.Goroutines {
 				break
 			}
 			v, ok := <-ch
@@ -233,24 +211,24 @@ func main() {
 			}
 			file.Write([]byte(v))
 		}
-	} else if method == "linear" {
+	} else if conf.Method == "linear" {
 		res_Ch := make(chan string)
 		ip_ch := make(chan string)
 
 		// scanners
-		for range goroutines {
+		for range conf.Goroutines {
 			go func() {
 				// Transporter for TLS
-				tr := ctls(insecure, sni, alpn)
+				tr := ctls(conf.Insecure, conf.SNI, conf.Alpn)
 				for {
 					ip := <-ip_ch
 					// ping ip
 
 					minrtt := time.Millisecond
-					if ping {
+					if conf.Ping {
 						pinger, ping_err := probing.NewPinger(ip)
 						pinger.SetPrivileged(true)
-						pinger.Timeout = time.Duration(maxping) * time.Millisecond
+						pinger.Timeout = time.Duration(conf.MaxPing) * time.Millisecond
 						if ping_err != nil {
 							log.Println("PING: " + ping_err.Error())
 							continue
@@ -262,7 +240,7 @@ func main() {
 							continue
 						}
 
-						if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(maxping)*time.Millisecond) {
+						if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.MaxPing)*time.Millisecond) {
 							color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
 							continue
 						}
@@ -271,13 +249,13 @@ func main() {
 					}
 
 					// generate http req
-					req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: ip, Path: path}, Host: hostname}
-					req.Header = headers
+					req := http.Request{Method: "GET", URL: &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
+					req.Header = conf.Headers
 
 					var client *http.Client
 					if conf.Scheme == "https" {
-						if h3 {
-							tconf := tls.Config{ServerName: sni, NextProtos: []string{"h3"}, InsecureSkipVerify: insecure}
+						if conf.HTTP3 {
+							tconf := tls.Config{ServerName: conf.SNI, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
 							qconf := quic.Config{}
 							h3wraper := http3.RoundTripper{TLSClientConfig: &tconf, QUICConfig: &qconf}
 							client = &http.Client{
@@ -290,7 +268,7 @@ func main() {
 						client = http.DefaultClient
 					}
 
-					client.Timeout = time.Millisecond * time.Duration(maxletency)
+					client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
 					s := time.Now()
 					// send request
 					respone, http_err := client.Do(&req)
@@ -301,10 +279,10 @@ func main() {
 						continue
 					}
 
-					if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, respheaders) {
+					if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, conf.ResponseHeader) {
 						// Calc jiiter
 						jitter_str := ""
-						if cjitter {
+						if conf.Jitter {
 							latencies := []float64{}
 							jammed := false
 							for range 5 {
@@ -318,8 +296,8 @@ func main() {
 									break
 								}
 								latencies = append(latencies, float64(latency))
-								if jitterInterval > 0 {
-									time.Sleep(time.Millisecond * time.Duration(jitterInterval))
+								if conf.JitterInterval > 0 {
+									time.Sleep(time.Millisecond * time.Duration(conf.JitterInterval))
 								}
 							}
 							if jammed {
@@ -327,7 +305,7 @@ func main() {
 								continue
 							}
 							jitter := Calc_jitter(latencies)
-							if jitter > maxjitter {
+							if jitter > conf.MaxJitter {
 								color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
 								continue
 							}
@@ -357,7 +335,7 @@ func main() {
 			}
 		}()
 
-		file, _ := os.ReadFile(iplistpath)
+		file, _ := os.ReadFile(conf.IplistPath)
 		for _, iprange := range strings.Split(string(file), "\n") {
 			for n4 := range 256 {
 				ip_ch <- strings.Replace(strings.TrimSpace(iprange), "0/24", strconv.Itoa(n4), 1)
