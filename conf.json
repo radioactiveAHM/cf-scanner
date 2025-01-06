@@ -11,6 +11,7 @@
 	"SNI": "cp.cloudflare.com",
 	"Insecure": false,
 	"Scheme": "https",
+	"Ping": true,
 	"MaxPing": 200,
 	"Goroutines": 2,
 	"Scans": 6000,

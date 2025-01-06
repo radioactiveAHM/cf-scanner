@@ -27,6 +27,7 @@ type Conf struct {
 	ResponseHeader map[string]string   `json:"ResponseHeader"`
 	SNI            string              `json:"SNI"`
 	Insecure       bool                `json:"Insecure"`
+	Ping           bool                `json:"Ping"`
 	MaxPing        int                 `json:"MaxPing"`
 	Goroutines     int                 `json:"Goroutines"`
 	Scans          int                 `json:"Scans"`
@@ -62,6 +63,7 @@ func main() {
 	path := conf.Path
 	headers := conf.Headers
 	sni := conf.SNI
+	ping := conf.Ping
 	maxping := conf.MaxPing
 	goroutines := conf.Goroutines
 	scans := conf.Scans
@@ -113,24 +115,29 @@ func main() {
 						log.Fatalf("Invalid IP version")
 					}
 
-					// ping ip
-					pinger, ping_err := probing.NewPinger(ip)
-					pinger.SetPrivileged(true)
-					pinger.Timeout = time.Duration(maxping) * time.Millisecond
-					if ping_err != nil {
-						log.Println("PING: " + ping_err.Error())
-						continue
-					}
-					pinger.Count = 1
-					pinging_err := pinger.Run()
-					if pinging_err != nil {
-						log.Println("PING: " + pinging_err.Error())
-						continue
-					}
+					minrtt := time.Millisecond
+					if ping {
+						// ping ip
+						pinger, ping_err := probing.NewPinger(ip)
+						pinger.SetPrivileged(true)
+						pinger.Timeout = time.Duration(maxping) * time.Millisecond
+						if ping_err != nil {
+							log.Println("PING: " + ping_err.Error())
+							continue
+						}
+						pinger.Count = 1
+						pinging_err := pinger.Run()
+						if pinging_err != nil {
+							log.Println("PING: " + pinging_err.Error())
+							continue
+						}
 
-					if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(maxping)*time.Millisecond) {
-						color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
-						continue
+						if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(maxping)*time.Millisecond) {
+							color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
+							continue
+						}
+
+						minrtt = pinger.Statistics().MinRtt
 					}
 
 					// generate http req
@@ -142,7 +149,7 @@ func main() {
 						if h3 {
 							tconf := tls.Config{ServerName: sni, NextProtos: []string{"h3"}, InsecureSkipVerify: insecure}
 							qconf := quic.Config{}
-							h3wraper := http3.RoundTripper{TLSClientConfig: &tconf, QUICConfig: &qconf}
+							h3wraper := http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
 							client = &http.Client{
 								Transport: &h3wraper,
 							}
@@ -186,21 +193,21 @@ func main() {
 								}
 							}
 							if jammed {
-								color.Red("%s\t%s\t%d\tJAMMED\n", ip, pinger.Statistics().MinRtt, latency)
+								color.Red("%s\t%s\t%d\tJAMMED\n", ip, minrtt, latency)
 								continue
 							}
 							jitter := Calc_jitter(latencies)
 							if jitter > maxjitter {
-								color.Yellow("%s\t%s\t%d\t%f\n", ip, pinger.Statistics().MinRtt, latency, jitter)
+								color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
 								continue
 							}
 							jitter_str = fmt.Sprintf("\t%f", jitter)
 						}
-						rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, pinger.Statistics().MinRtt, latency, jitter_str)
+						rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, minrtt, latency, jitter_str)
 						color.Green("%s", rep)
 						ch <- rep
 					} else {
-						color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, pinger.Statistics().MinRtt, respone.StatusCode)
+						color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
 					}
 				}
 				ch <- "end"
@@ -238,23 +245,29 @@ func main() {
 				for {
 					ip := <-ip_ch
 					// ping ip
-					pinger, ping_err := probing.NewPinger(ip)
-					pinger.SetPrivileged(true)
-					pinger.Timeout = time.Duration(maxping) * time.Millisecond
-					if ping_err != nil {
-						log.Println("PING: " + ping_err.Error())
-						continue
-					}
-					pinger.Count = 1
-					pinging_err := pinger.Run()
-					if pinging_err != nil {
-						log.Println("PING: " + pinging_err.Error())
-						continue
-					}
 
-					if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(maxping)*time.Millisecond) {
-						color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
-						continue
+					minrtt := time.Millisecond
+					if ping {
+						pinger, ping_err := probing.NewPinger(ip)
+						pinger.SetPrivileged(true)
+						pinger.Timeout = time.Duration(maxping) * time.Millisecond
+						if ping_err != nil {
+							log.Println("PING: " + ping_err.Error())
+							continue
+						}
+						pinger.Count = 1
+						pinging_err := pinger.Run()
+						if pinging_err != nil {
+							log.Println("PING: " + pinging_err.Error())
+							continue
+						}
+
+						if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(maxping)*time.Millisecond) {
+							color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
+							continue
+						}
+
+						minrtt = pinger.Statistics().MinRtt
 					}
 
 					// generate http req
@@ -310,21 +323,21 @@ func main() {
 								}
 							}
 							if jammed {
-								color.Red("%s\t%s\t%d\tJAMMED\n", ip, pinger.Statistics().MinRtt, latency)
+								color.Red("%s\t%s\t%d\tJAMMED\n", ip, minrtt, latency)
 								continue
 							}
 							jitter := Calc_jitter(latencies)
 							if jitter > maxjitter {
-								color.Yellow("%s\t%s\t%d\t%f\n", ip, pinger.Statistics().MinRtt, latency, jitter)
+								color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
 								continue
 							}
 							jitter_str = fmt.Sprintf("\t%f", jitter)
 						}
-						rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, pinger.Statistics().MinRtt, latency, jitter_str)
+						rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, minrtt, latency, jitter_str)
 						color.Green("%s", rep)
 						res_Ch <- rep
 					} else {
-						color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, pinger.Statistics().MinRtt, respone.StatusCode)
+						color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
 					}
 				}
 			}()
