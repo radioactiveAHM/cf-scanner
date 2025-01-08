@@ -24,5 +24,7 @@
 	"IplistPath": "ipv4.txt",
 	"IgnoreRange": ["104", "172"],
 	"HTTP/3": false,
-	"Method": "random"
+	"Method": "random",
+	"Upload": true,
+	"UploadSize": 65536
 }

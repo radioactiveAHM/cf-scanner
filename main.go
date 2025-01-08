@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -43,6 +45,7 @@ type Conf struct {
 	HTTP3          bool                `json:"HTTP/3"`
 	Method         string              `json:"Method"`
 	Upload         bool                `json:"Upload"`
+	UploadSize     int64               `json:"UploadSize"`
 }
 
 func main() {
@@ -96,6 +99,7 @@ func main() {
 					minrtt := time.Millisecond
 					if conf.Ping {
 						// ping ip
+						fmt.Println(ip)
 						pinger, ping_err := probing.NewPinger(ip)
 						pinger.SetPrivileged(true)
 						pinger.Timeout = time.Duration(conf.MaxPing) * time.Millisecond
@@ -152,6 +156,7 @@ func main() {
 					if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, conf.ResponseHeader) {
 						// Calc jiiter
 						jitter_str := ""
+						upload_latency := ""
 						if conf.Jitter {
 							latencies := []float64{}
 							jammed := false
@@ -181,7 +186,23 @@ func main() {
 							}
 							jitter_str = fmt.Sprintf("\t%f", jitter)
 						}
-						rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, minrtt, latency, jitter_str)
+						if conf.Upload {
+							req := http.Request{
+								Method: "POST",
+								URL:    &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path},
+								Host:   conf.Hostname, Body: io.NopCloser(bytes.NewBuffer(make([]byte, conf.UploadSize))),
+							}
+							s := time.Now()
+							// send request
+							_, http_err := client.Do(&req)
+							e := time.Now()
+							if http_err != nil {
+								upload_latency = "Failed"
+							} else {
+								upload_latency = fmt.Sprintf("\t%d", e.UnixMilli()-s.UnixMilli())
+							}
+						}
+						rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, upload_latency)
 						color.Green("%s", rep)
 						ch <- rep
 					} else {
@@ -282,6 +303,7 @@ func main() {
 					if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, conf.ResponseHeader) {
 						// Calc jiiter
 						jitter_str := ""
+						upload_latency := ""
 						if conf.Jitter {
 							latencies := []float64{}
 							jammed := false
@@ -311,7 +333,23 @@ func main() {
 							}
 							jitter_str = fmt.Sprintf("\t%f", jitter)
 						}
-						rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, minrtt, latency, jitter_str)
+						if conf.Upload {
+							req := http.Request{
+								Method: "POST",
+								URL:    &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path},
+								Host:   conf.Hostname, Body: io.NopCloser(bytes.NewBuffer(make([]byte, conf.UploadSize))),
+							}
+							s := time.Now()
+							// send request
+							_, http_err := client.Do(&req)
+							e := time.Now()
+							if http_err != nil {
+								upload_latency = "Failed"
+							} else {
+								upload_latency = fmt.Sprintf("\t%d", e.UnixMilli()-s.UnixMilli())
+							}
+						}
+						rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, upload_latency)
 						color.Green("%s", rep)
 						res_Ch <- rep
 					} else {

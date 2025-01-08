@@ -4,7 +4,7 @@ go 1.23.4
 
 require (
 	github.com/fatih/color v1.18.0
-	github.com/prometheus-community/pro-bing v0.5.0
+	github.com/prometheus-community/pro-bing v0.4.1
 	github.com/quic-go/quic-go v0.48.2
 )
 
