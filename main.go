@@ -99,7 +99,6 @@ func main() {
 					minrtt := time.Millisecond
 					if conf.Ping {
 						// ping ip
-						fmt.Println(ip)
 						pinger, ping_err := probing.NewPinger(ip)
 						pinger.SetPrivileged(true)
 						pinger.Timeout = time.Duration(conf.MaxPing) * time.Millisecond
