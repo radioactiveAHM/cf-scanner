@@ -198,7 +198,7 @@ func main() {
 							if http_err != nil {
 								upload_latency = "Failed"
 							} else {
-								upload_latency = fmt.Sprintf("\t%d", e.UnixMilli()-s.UnixMilli())
+								upload_latency = fmt.Sprintf("%d", e.UnixMilli()-s.UnixMilli())
 							}
 						}
 						rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, upload_latency)
@@ -345,7 +345,7 @@ func main() {
 							if http_err != nil {
 								upload_latency = "Failed"
 							} else {
-								upload_latency = fmt.Sprintf("\t%d", e.UnixMilli()-s.UnixMilli())
+								upload_latency = fmt.Sprintf("%d", e.UnixMilli()-s.UnixMilli())
 							}
 						}
 						rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, upload_latency)

@@ -1,3 +1,4 @@
 cfscanner.exe
 result.txt
+dist/# Added by goreleaser init:
 dist/
