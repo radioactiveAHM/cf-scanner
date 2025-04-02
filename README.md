@@ -17,27 +17,39 @@ go build -ldflags "-w -s"
 
 ## Configuration Parameters
 
-- **Hostname**: The target hostname or domain to scan (e.g., `sub.example.com`).
-- **Path**: The path to append to the hostname (e.g., `/test`).
-- **Headers**: HTTP headers.
-- **ResponseHeader**: Headers that an HTTP response must include.
-- **SNI (Server Name Indication)**: The SNI value to use during the TLS handshake (e.g., `example.com`).
-- **Insecure**: Certificate validation.
-- **Utls**: Enable UTLS fingerprint. Supported fingerprints are `firefox`, `edge`, `chrome`, `360` and `ios`.
-- **Scheme**: The protocol scheme (`http` or `https`). In this case, it’s `https`.
-- **Ping**: Enable ping IP.
-- **MaxPing**: Maximum acceptable ping time (in milliseconds).
-- **Goroutines**: Number of concurrent goroutines for scanning. Here, it’s set to `1`.
-- **Scans**: Total number of scans to perform. The example specifies `6000`.
-- **MaxLatency**: Maximum acceptable latency (in milliseconds). Set to `500`.
-- **Jitter**: Enable jitter calculation.
-- **MaxJitter**: Acceptable jitter.
-- **JitterInterval**: Sleep time interval between jitter calculations (in milliseconds).
-- **ALPN**: List of supported ALPN (Application-Layer Protocol Negotiation) protocols.
-- **IPVersion**: IP version (`v4` or `v6`).
-- **IPListPath**: Path to the file containing a list of IP addresses (e.g., `ipv4.txt`).
-- **IgnoreRange**: A list of octets where each IP matching the first octet will be ignored.
-- **HTTP/3**: Use HTTP version 3 or not.
-- **Method**: Scanning method. Values can be `random` or `linear`.
-- **Upload**: Enable upload latency test.
-- **UploadSize**: The size of the buffer to upload.
+```json
+{
+ "Hostname": "cp.cloudflare.com", // The target hostname or domain to scan
+ "Path": "/", // The path to append to the hostname
+ "Headers": { // Additional HTTP headers
+  "User-Agent": ["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0)"],
+  "Accept-Encoding": ["gzip", "br"]
+ },
+ "ResponseHeader": { // Headers that an HTTP response must include
+  "Server": "cloudflare"
+ },
+ "SNI": "cp.cloudflare.com", // The SNI value to use during the TLS handshake
+ "Insecure": false, // Certificate validation
+ "Utls": { // Enable UTLS fingerprint. Supported fingerprints are firefox, edge, chrome, 360 and ios
+  "Enable": true,
+  "Fingerprint": "firefox"
+ },
+ "Scheme": "https", // The protocol scheme (http or https)
+ "Ping": true, // Enable ping IP
+ "MaxPing": 200, // Maximum acceptable ping time (in milliseconds)
+ "Goroutines": 2, // Number of concurrent goroutines for scanning
+ "Scans": 6000, // Total number of scans to perform
+ "Maxlatency": 1000, // Maximum acceptable latency (in milliseconds)
+ "Jitter": true, // Enable jitter calculation
+ "MaxJitter": 20, // Acceptable jitter
+ "JitterInterval": 200, // Sleep time interval between jitter calculations (in milliseconds)
+ "Alpn": ["http/1.1"], // List of supported ALPN (Application-Layer Protocol Negotiation) protocols
+ "IpVersion": "v4", // IP version (`v4` or `v6`)
+ "IplistPath": "ipv4.txt", // Path to the file containing a list of IP addresses (e.g., `ipv4.txt`)
+ "IgnoreRange": ["104", "172"], // List of octets where each IP matching the first octet will be ignored
+ "HTTP/3": false, // Use HTTP version 3 or not.
+ "Method": "random", // Scanning method. Values can be random or linear
+ "Upload": false, // Enable upload latency test
+ "UploadSize": 65536 // The size of the buffer to upload
+}
+```
