@@ -23,6 +23,7 @@ go build -ldflags "-w -s"
 - **ResponseHeader**: Headers that an HTTP response must include.
 - **SNI (Server Name Indication)**: The SNI value to use during the TLS handshake (e.g., `example.com`).
 - **Insecure**: Certificate validation.
+- **Utls**: Enable UTLS fingerprint. Supported fingerprints are `firefox`, `edge`, `chrome`, `360` and `ios`.
 - **Scheme**: The protocol scheme (`http` or `https`). In this case, it’s `https`.
 - **Ping**: Enable ping IP.
 - **MaxPing**: Maximum acceptable ping time (in milliseconds).

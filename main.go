@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,10 +19,18 @@ import (
 
 	"github.com/fatih/color"
 	probing "github.com/prometheus-community/pro-bing"
+	"golang.org/x/net/http2"
 
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
+
+	utls "github.com/refraction-networking/utls"
 )
+
+type UtlsConfig struct {
+	Enable      bool   `json:"Enable"`
+	Fingerprint string `json:"Fingerprint"`
+}
 
 type Conf struct {
 	Hostname       string              `json:"Hostname"`
@@ -29,6 +39,7 @@ type Conf struct {
 	ResponseHeader map[string]string   `json:"ResponseHeader"`
 	SNI            string              `json:"SNI"`
 	Insecure       bool                `json:"Insecure"`
+	Utls           UtlsConfig          `json:"Utls"`
 	Ping           bool                `json:"Ping"`
 	MaxPing        int                 `json:"MaxPing"`
 	Goroutines     int                 `json:"Goroutines"`
@@ -60,6 +71,11 @@ func main() {
 		log.Fatalln(conf_err.Error())
 	}
 
+	fingerprint := utls.HelloChrome_Auto
+	if conf.Utls.Enable {
+		fingerprint = fgen(conf.Utls.Fingerprint)
+	}
+
 	log.Println("start of app")
 
 	if conf.Method == "random" {
@@ -67,7 +83,7 @@ func main() {
 		for range conf.Goroutines {
 			go func() {
 				// Transporter for TLS
-				tr := ctls(conf.Insecure, conf.SNI, conf.Alpn)
+				tr := http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: conf.Insecure}}
 
 				// Load IP list file
 				file, _ := os.ReadFile(conf.IplistPath)
@@ -135,7 +151,25 @@ func main() {
 								Transport: &h3wraper,
 							}
 						} else {
-							client = &http.Client{Transport: &tr}
+							if conf.Utls.Enable {
+								h2 := http2.Transport{
+									DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
+										dialConn, err := net.Dial(network, addr)
+										if err != nil {
+											return nil, err
+										}
+										config := utls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}
+										uTlsConn := utls.UClient(dialConn, &config, fingerprint)
+										return uTlsConn, nil
+									},
+								}
+
+								client = &http.Client{
+									Transport: &h2,
+								}
+							} else {
+								client = &http.Client{Transport: &tr}
+							}
 						}
 					} else {
 						client = http.DefaultClient
@@ -239,7 +273,7 @@ func main() {
 		for range conf.Goroutines {
 			go func() {
 				// Transporter for TLS
-				tr := ctls(conf.Insecure, conf.SNI, conf.Alpn)
+				tr := http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: conf.Insecure}}
 				for {
 					ip := <-ip_ch
 					// ping ip
@@ -282,7 +316,25 @@ func main() {
 								Transport: &h3wraper,
 							}
 						} else {
-							client = &http.Client{Transport: &tr}
+							if conf.Utls.Enable {
+								h2 := http2.Transport{
+									DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
+										dialConn, err := net.Dial(network, addr)
+										if err != nil {
+											return nil, err
+										}
+										config := utls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}
+										uTlsConn := utls.UClient(dialConn, &config, fingerprint)
+										return uTlsConn, nil
+									},
+								}
+
+								client = &http.Client{
+									Transport: &h2,
+								}
+							} else {
+								client = &http.Client{Transport: &tr}
+							}
 						}
 					} else {
 						client = http.DefaultClient
@@ -396,16 +448,31 @@ func match(headers http.Header, tomatch map[string]string) bool {
 func ignore(ip string, ignoringList []string) bool {
 	n1 := strings.Split(ip, ".")[0]
 	for _, ig := range ignoringList {
-		if n1 == ig {
+		ignoren1 := strings.Split(ig, ".")[0]
+		if n1 == ignoren1 {
 			return true
 		}
 	}
 	return false
 }
 
-func ctls(insecure bool, sni string, alpn []string) http.Transport {
-	if insecure {
-		return (http.Transport{TLSClientConfig: &tls.Config{ServerName: sni, NextProtos: alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: true}})
+func fgen(f string) utls.ClientHelloID {
+	var finger utls.ClientHelloID
+
+	switch f {
+	case "firefox":
+		finger = utls.HelloFirefox_Auto
+	case "edge":
+		finger = utls.HelloEdge_Auto
+	case "chrome":
+		finger = utls.HelloChrome_Auto
+	case "360":
+		finger = utls.Hello360_Auto
+	case "ios":
+		finger = utls.HelloIOS_Auto
+	default:
+		log.Fatalln("Invalid fingerprint")
 	}
-	return (http.Transport{TLSClientConfig: &tls.Config{ServerName: sni, NextProtos: alpn, MinVersion: tls.VersionTLS13}})
+
+	return finger
 }
