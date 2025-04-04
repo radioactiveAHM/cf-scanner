@@ -27,6 +27,8 @@ archives:
   - formats: [tar.gz]
     files:
       - conf.json
+      - ipv4.txt
+      - ipv6.txt
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}_

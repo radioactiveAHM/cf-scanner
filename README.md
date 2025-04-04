@@ -1,8 +1,10 @@
 # cf-scanner
 
-["فارسی"](/README_fa.md)
-
 ["اموزش فارسی"](/tutorial/FA.md)
+
+["English Tutorial"](/tutorial/EN.md)
+
+["Русский учебник"](/tutorial/RU.md)
 
 Cloudflare IP scanner
 
