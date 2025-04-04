@@ -57,6 +57,8 @@ type Conf struct {
 	Method         string              `json:"Method"`
 	Upload         bool                `json:"Upload"`
 	UploadSize     int64               `json:"UploadSize"`
+	Padding        bool                `json:"Padding"`
+	PaddingSize    string              `json:"PaddingSize"`
 }
 
 func main() {
@@ -140,6 +142,10 @@ func main() {
 					// generate http req
 					req := http.Request{Method: "GET", URL: &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
 					req.Header = conf.Headers
+					req.Header.Set("Host", conf.Hostname)
+					if conf.Padding {
+						req.Header.Set("Cookie", genPadding(conf.PaddingSize))
+					}
 
 					var client *http.Client
 					if conf.Scheme == "https" {
@@ -305,6 +311,10 @@ func main() {
 					// generate http req
 					req := http.Request{Method: "GET", URL: &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
 					req.Header = conf.Headers
+					req.Header.Set("Host", conf.Hostname)
+					if conf.Padding {
+						req.Header.Set("Cookie", genPadding(conf.PaddingSize))
+					}
 
 					var client *http.Client
 					if conf.Scheme == "https" {
@@ -475,4 +485,19 @@ func fgen(f string) utls.ClientHelloID {
 	}
 
 	return finger
+}
+
+func genPadding(r string) string {
+	ab := strings.Split(r, "-")
+	a, a_err := strconv.Atoi(ab[0])
+	if a_err != nil {
+		log.Fatalln(a_err)
+	}
+	b, b_err := strconv.Atoi(ab[1])
+	if b_err != nil {
+		log.Fatalln(b_err)
+	}
+	randomNumber := rand.Intn(b-a+1) + a
+
+	return strings.Repeat("X", randomNumber)
 }

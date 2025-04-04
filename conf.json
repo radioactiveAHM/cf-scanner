@@ -30,5 +30,7 @@
 	"HTTP/3": false,
 	"Method": "random",
 	"Upload": false,
-	"UploadSize": 65536
+	"UploadSize": 65536,
+	"Padding": true,
+	"PaddingSize": "50-500"
 }
