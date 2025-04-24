@@ -160,12 +160,16 @@ func main() {
 							if conf.Utls.Enable {
 								h2 := http2.Transport{
 									DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
-										dialConn, err := net.Dial(network, addr)
+										dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(conf.Maxlatency))
 										if err != nil {
 											return nil, err
 										}
 										config := utls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}
 										uTlsConn := utls.UClient(dialConn, &config, fingerprint)
+										handshake_e := uTlsConn.HandshakeContext(ctx)
+										if handshake_e != nil {
+											return nil, handshake_e
+										}
 										return uTlsConn, nil
 									},
 								}
@@ -329,12 +333,17 @@ func main() {
 							if conf.Utls.Enable {
 								h2 := http2.Transport{
 									DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
-										dialConn, err := net.Dial(network, addr)
+										dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(conf.Maxlatency))
 										if err != nil {
 											return nil, err
 										}
+
 										config := utls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}
 										uTlsConn := utls.UClient(dialConn, &config, fingerprint)
+										handshake_e := uTlsConn.HandshakeContext(ctx)
+										if handshake_e != nil {
+											return nil, handshake_e
+										}
 										return uTlsConn, nil
 									},
 								}
