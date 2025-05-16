@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"math/rand"
 	"net"
 	"net/http"
@@ -141,7 +142,7 @@ func main() {
 
 					// generate http req
 					req := http.Request{Method: "GET", URL: &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
-					req.Header = conf.Headers
+					req.Header = maps.Clone(conf.Headers)
 					req.Header.Set("Host", conf.Hostname)
 					if conf.Padding {
 						req.Header.Set("Cookie", genPadding(conf.PaddingSize))
@@ -314,7 +315,7 @@ func main() {
 
 					// generate http req
 					req := http.Request{Method: "GET", URL: &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
-					req.Header = conf.Headers
+					req.Header = maps.Clone(conf.Headers)
 					req.Header.Set("Host", conf.Hostname)
 					if conf.Padding {
 						req.Header.Set("Cookie", genPadding(conf.PaddingSize))
@@ -325,7 +326,7 @@ func main() {
 						if conf.HTTP3 {
 							tconf := tls.Config{ServerName: conf.SNI, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
 							qconf := quic.Config{}
-							h3wraper := http3.RoundTripper{TLSClientConfig: &tconf, QUICConfig: &qconf}
+							h3wraper := http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
 							client = &http.Client{
 								Transport: &h3wraper,
 							}
