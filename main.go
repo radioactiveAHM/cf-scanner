@@ -152,7 +152,10 @@ func main() {
 					if conf.Scheme == "https" {
 						if conf.HTTP3 {
 							tconf := tls.Config{ServerName: conf.SNI, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
-							qconf := quic.Config{}
+							qconf := quic.Config{
+								InitialConnectionReceiveWindow: 1024 * 8,
+								InitialStreamReceiveWindow:     1024 * 8,
+							}
 							h3wraper := http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
 							client = &http.Client{
 								Transport: &h3wraper,
@@ -160,6 +163,8 @@ func main() {
 						} else {
 							if conf.Utls.Enable {
 								h2 := http2.Transport{
+									MaxHeaderListSize: 1024 * 8,
+									MaxReadFrameSize:  1024 * 16,
 									DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
 										dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(conf.Maxlatency))
 										if err != nil {
@@ -325,7 +330,10 @@ func main() {
 					if conf.Scheme == "https" {
 						if conf.HTTP3 {
 							tconf := tls.Config{ServerName: conf.SNI, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
-							qconf := quic.Config{}
+							qconf := quic.Config{
+								InitialConnectionReceiveWindow: 1024 * 8,
+								InitialStreamReceiveWindow:     1024 * 8,
+							}
 							h3wraper := http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
 							client = &http.Client{
 								Transport: &h3wraper,
@@ -333,6 +341,8 @@ func main() {
 						} else {
 							if conf.Utls.Enable {
 								h2 := http2.Transport{
+									MaxHeaderListSize: 1024 * 8,
+									MaxReadFrameSize:  1024 * 16,
 									DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
 										dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(conf.Maxlatency))
 										if err != nil {

@@ -5,7 +5,7 @@ go 1.24.3
 require (
 	github.com/fatih/color v1.18.0
 	github.com/prometheus-community/pro-bing v0.7.0
-	github.com/quic-go/quic-go v0.51.0
+	github.com/quic-go/quic-go v0.52.0
 	github.com/refraction-networking/utls v1.7.3
 	golang.org/x/net v0.40.0
 )
