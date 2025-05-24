@@ -17,6 +17,15 @@ go mod tidy
 go build -ldflags "-w -s"
 ```
 
+## Sort `result.txt` file
+
+- Windows:
+  - Powershell: `Get-Content result.txt | Sort-Object { ($_ -split '\s+')[2] } | Out-File sorted_result.txt`
+  - CMD: `powershell "Get-Content result.txt | Sort-Object { ($_ -split '\s+')[2] } | Out-File sorted_result.txt"`
+  - NuShell `powershell "Get-Content result.txt | Sort-Object { ($_ -split '\\s+')[2] } | Out-File sorted_result.txt"`
+- Linux:
+  - Bash: `sort -k3,3 -n result.txt > sorted_result.txt`
+
 ## Configuration Parameters
 
 ```json
@@ -39,9 +48,10 @@ go build -ldflags "-w -s"
  "Scheme": "https", // The protocol scheme (http or https)
  "Ping": true, // Enable ping IP
  "MaxPing": 200, // Maximum acceptable ping time (in milliseconds)
- "Goroutines": 2, // Number of concurrent goroutines for scanning
+ "Goroutines": 4, // Number of concurrent goroutines for scanning
  "Scans": 6000, // Total number of scans to perform
  "Maxlatency": 1000, // Maximum acceptable latency (in milliseconds)
+ "DynamicLatency": true, // Dynamically updates MaxLatency to an average latency during runtime.
  "Jitter": true, // Enable jitter calculation
  "MaxJitter": 20, // Acceptable jitter
  "JitterInterval": 200, // Sleep time interval between jitter calculations (in milliseconds)
@@ -52,6 +62,8 @@ go build -ldflags "-w -s"
  "HTTP/3": false, // Use HTTP version 3 or not.
  "Method": "random", // Scanning method. Values can be random or linear
  "Upload": false, // Enable upload latency test
- "UploadSize": 65536 // The size of the buffer to upload
+ "UploadSize": 65536, // The size of the buffer to upload,
+ "Padding": true, // Enable padding in HTTP requests by adding random text as cookies. This helps eliminate fixed-size requests, enhancing security and privacy.
+ "PaddingSize": "50-500" // Padding size range.
 }
 ```

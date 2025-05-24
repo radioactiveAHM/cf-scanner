@@ -46,6 +46,7 @@ type Conf struct {
 	Goroutines     int                 `json:"Goroutines"`
 	Scans          int                 `json:"Scans"`
 	Maxlatency     int64               `json:"Maxlatency"`
+	DynamicLatency bool                `json:"DynamicLatency"`
 	Jitter         bool                `json:"Jitter"`
 	MaxJitter      float64             `json:"MaxJitter"`
 	JitterInterval int64               `json:"JitterInterval"`
@@ -91,6 +92,7 @@ func main() {
 				// Load IP list file
 				file, _ := os.ReadFile(conf.IplistPath)
 				ip := ""
+				localMaxlatency := conf.Maxlatency
 				for range conf.Scans {
 					// pick an ip
 					if conf.IpVersion == "v4" {
@@ -166,7 +168,7 @@ func main() {
 									MaxHeaderListSize: 1024 * 8,
 									MaxReadFrameSize:  1024 * 16,
 									DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
-										dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(conf.Maxlatency))
+										dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(localMaxlatency))
 										if err != nil {
 											return nil, err
 										}
@@ -191,7 +193,7 @@ func main() {
 						client = http.DefaultClient
 					}
 
-					client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
+					client.Timeout = time.Millisecond * time.Duration(localMaxlatency)
 					s := time.Now()
 					// send request
 					respone, http_err := client.Do(&req)
@@ -203,6 +205,9 @@ func main() {
 					}
 
 					if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, conf.ResponseHeader) {
+						if conf.DynamicLatency {
+							localMaxlatency = ((localMaxlatency + latency) / 2) + 100
+						}
 						// Calc jiiter
 						jitter_str := ""
 						upload_latency := ""
@@ -290,6 +295,7 @@ func main() {
 			go func() {
 				// Transporter for TLS
 				tr := http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: conf.Insecure}}
+				localMaxlatency := conf.Maxlatency
 				for {
 					ip := <-ip_ch
 					// ping ip
@@ -344,7 +350,7 @@ func main() {
 									MaxHeaderListSize: 1024 * 8,
 									MaxReadFrameSize:  1024 * 16,
 									DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
-										dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(conf.Maxlatency))
+										dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(localMaxlatency))
 										if err != nil {
 											return nil, err
 										}
@@ -370,7 +376,7 @@ func main() {
 						client = http.DefaultClient
 					}
 
-					client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
+					client.Timeout = time.Millisecond * time.Duration(localMaxlatency)
 					s := time.Now()
 					// send request
 					respone, http_err := client.Do(&req)
@@ -382,6 +388,9 @@ func main() {
 					}
 
 					if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, conf.ResponseHeader) {
+						if conf.DynamicLatency {
+							localMaxlatency = ((localMaxlatency + latency) / 2) + 100
+						}
 						// Calc jiiter
 						jitter_str := ""
 						upload_latency := ""
