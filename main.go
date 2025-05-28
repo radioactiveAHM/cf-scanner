@@ -206,7 +206,7 @@ func main() {
 
 					if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, conf.ResponseHeader) {
 						if conf.DynamicLatency {
-							localMaxlatency = ((localMaxlatency + latency) / 2) + 100
+							localMaxlatency = (localMaxlatency + latency) / 2
 						}
 						// Calc jiiter
 						jitter_str := ""
@@ -389,7 +389,7 @@ func main() {
 
 					if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, conf.ResponseHeader) {
 						if conf.DynamicLatency {
-							localMaxlatency = ((localMaxlatency + latency) / 2) + 100
+							localMaxlatency = (localMaxlatency + latency) / 2
 						}
 						// Calc jiiter
 						jitter_str := ""
