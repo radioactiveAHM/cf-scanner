@@ -1,5 +1,6 @@
 {
 	"Hostname": "cp.cloudflare.com",
+	"Ports": [],
 	"Path": "/",
 	"Headers": {
 		"User-Agent": ["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0)"],
@@ -30,8 +31,6 @@
 	"IgnoreRange": ["104", "172"],
 	"HTTP/3": false,
 	"Method": "random",
-	"Upload": false,
-	"UploadSize": 65536,
 	"Padding": true,
 	"PaddingSize": "50-500"
 }

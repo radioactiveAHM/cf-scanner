@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"maps"
 	"math/rand"
@@ -35,6 +33,7 @@ type UtlsConfig struct {
 
 type Conf struct {
 	Hostname       string              `json:"Hostname"`
+	Ports          []int               `json:"Ports"`
 	Path           string              `json:"Path"`
 	Headers        map[string][]string `json:"Headers"`
 	ResponseHeader map[string]string   `json:"ResponseHeader"`
@@ -57,8 +56,6 @@ type Conf struct {
 	IgnoreRange    []string            `json:"IgnoreRange"`
 	HTTP3          bool                `json:"HTTP/3"`
 	Method         string              `json:"Method"`
-	Upload         bool                `json:"Upload"`
-	UploadSize     int64               `json:"UploadSize"`
 	Padding        bool                `json:"Padding"`
 	PaddingSize    string              `json:"PaddingSize"`
 }
@@ -80,7 +77,15 @@ func main() {
 		fingerprint = fgen(conf.Utls.Fingerprint)
 	}
 
-	log.Println("start of app")
+	if len(conf.Ports) == 0 {
+		if conf.Scheme == "https" {
+			conf.Ports = append(conf.Ports, 443)
+		} else {
+			conf.Ports = append(conf.Ports, 80)
+		}
+	}
+
+	log.Println("Starting Scanner ->")
 
 	if conf.Method == "random" {
 		ch := make(chan string)
@@ -91,9 +96,9 @@ func main() {
 
 				// Load IP list file
 				file, _ := os.ReadFile(conf.IplistPath)
-				ip := ""
 				localMaxlatency := conf.Maxlatency
 				for range conf.Scans {
+					ip := ""
 					// pick an ip
 					if conf.IpVersion == "v4" {
 						ranges := strings.Split(string(file), "\n")
@@ -142,125 +147,111 @@ func main() {
 						minrtt = pinger.Statistics().MinRtt
 					}
 
-					// generate http req
-					req := http.Request{Method: "GET", URL: &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
-					req.Header = maps.Clone(conf.Headers)
-					req.Header.Set("Host", conf.Hostname)
-					if conf.Padding {
-						req.Header.Set("Cookie", genPadding(conf.PaddingSize))
-					}
+					for _, port := range conf.Ports {
+						ip := fmt.Sprintf("%s:%d", ip, port)
+						// generate http req
+						req := http.Request{Method: "GET", URL: &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
+						req.Header = maps.Clone(conf.Headers)
+						req.Header.Set("Host", conf.Hostname)
+						if conf.Padding {
+							req.Header.Set("Cookie", genPadding(conf.PaddingSize))
+						}
 
-					var client *http.Client
-					if conf.Scheme == "https" {
-						if conf.HTTP3 {
-							tconf := tls.Config{ServerName: conf.SNI, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
-							qconf := quic.Config{
-								InitialConnectionReceiveWindow: 1024 * 8,
-								InitialStreamReceiveWindow:     1024 * 8,
-							}
-							h3wraper := http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
-							client = &http.Client{
-								Transport: &h3wraper,
+						var client *http.Client
+						if conf.Scheme == "https" {
+							if conf.HTTP3 {
+								tconf := tls.Config{ServerName: conf.SNI, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
+								qconf := quic.Config{
+									InitialConnectionReceiveWindow: 1024 * 8,
+									InitialStreamReceiveWindow:     1024 * 8,
+								}
+								h3wraper := http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
+								client = &http.Client{
+									Transport: &h3wraper,
+								}
+							} else {
+								if conf.Utls.Enable {
+									h2 := http2.Transport{
+										MaxHeaderListSize: 1024 * 8,
+										MaxReadFrameSize:  1024 * 16,
+										DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
+											dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(localMaxlatency))
+											if err != nil {
+												return nil, err
+											}
+											config := utls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}
+											uTlsConn := utls.UClient(dialConn, &config, fingerprint)
+											handshake_e := uTlsConn.HandshakeContext(ctx)
+											if handshake_e != nil {
+												return nil, handshake_e
+											}
+											return uTlsConn, nil
+										},
+									}
+
+									client = &http.Client{
+										Transport: &h2,
+									}
+								} else {
+									client = &http.Client{Transport: &tr}
+								}
 							}
 						} else {
-							if conf.Utls.Enable {
-								h2 := http2.Transport{
-									MaxHeaderListSize: 1024 * 8,
-									MaxReadFrameSize:  1024 * 16,
-									DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
-										dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(localMaxlatency))
-										if err != nil {
-											return nil, err
-										}
-										config := utls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}
-										uTlsConn := utls.UClient(dialConn, &config, fingerprint)
-										handshake_e := uTlsConn.HandshakeContext(ctx)
-										if handshake_e != nil {
-											return nil, handshake_e
-										}
-										return uTlsConn, nil
-									},
-								}
+							client = http.DefaultClient
+						}
 
-								client = &http.Client{
-									Transport: &h2,
-								}
-							} else {
-								client = &http.Client{Transport: &tr}
-							}
+						client.Timeout = time.Millisecond * time.Duration(localMaxlatency)
+						s := time.Now()
+						// send request
+						respone, http_err := client.Do(&req)
+						e := time.Now()
+						latency := e.UnixMilli() - s.UnixMilli()
+						if http_err != nil {
+							color.Red("%s", http_err.Error())
+							continue
 						}
-					} else {
-						client = http.DefaultClient
-					}
 
-					client.Timeout = time.Millisecond * time.Duration(localMaxlatency)
-					s := time.Now()
-					// send request
-					respone, http_err := client.Do(&req)
-					e := time.Now()
-					latency := e.UnixMilli() - s.UnixMilli()
-					if http_err != nil {
-						color.Red("%s", http_err.Error())
-						continue
-					}
-
-					if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, conf.ResponseHeader) {
-						if conf.DynamicLatency {
-							localMaxlatency = (localMaxlatency + latency) / 2
-						}
-						// Calc jiiter
-						jitter_str := ""
-						upload_latency := ""
-						if conf.Jitter {
-							latencies := []float64{}
-							jammed := false
-							for range 5 {
-								s := time.Now()
-								// send request
-								_, http_err := client.Do(&req)
-								e := time.Now()
-								latency := e.UnixMilli() - s.UnixMilli()
-								if http_err != nil {
-									jammed = true
-									break
+						if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, conf.ResponseHeader) {
+							if conf.DynamicLatency {
+								localMaxlatency = (localMaxlatency + latency) / 2
+							}
+							// Calc jiiter
+							jitter_str := ""
+							if conf.Jitter {
+								latencies := []float64{}
+								jammed := false
+								for range 5 {
+									s := time.Now()
+									// send request
+									_, http_err := client.Do(&req)
+									e := time.Now()
+									latency := e.UnixMilli() - s.UnixMilli()
+									if http_err != nil {
+										jammed = true
+										break
+									}
+									latencies = append(latencies, float64(latency))
+									if conf.JitterInterval > 0 {
+										time.Sleep(time.Millisecond * time.Duration(conf.JitterInterval))
+									}
 								}
-								latencies = append(latencies, float64(latency))
-								if conf.JitterInterval > 0 {
-									time.Sleep(time.Millisecond * time.Duration(conf.JitterInterval))
+								if jammed {
+									color.Red("%s\t%s\t%d\tJAMMED\n", ip, minrtt, latency)
+									continue
 								}
+								jitter := Calc_jitter(latencies)
+								if jitter > conf.MaxJitter {
+									color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
+									continue
+								}
+								jitter_str = fmt.Sprintf("\t%f", jitter)
 							}
-							if jammed {
-								color.Red("%s\t%s\t%d\tJAMMED\n", ip, minrtt, latency)
-								continue
-							}
-							jitter := Calc_jitter(latencies)
-							if jitter > conf.MaxJitter {
-								color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
-								continue
-							}
-							jitter_str = fmt.Sprintf("\t%f", jitter)
+							rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, minrtt, latency, jitter_str)
+							color.Green("%s", rep)
+							ch <- rep
+						} else {
+							color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
 						}
-						if conf.Upload {
-							req := http.Request{
-								Method: "POST",
-								URL:    &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path},
-								Host:   conf.Hostname, Body: io.NopCloser(bytes.NewBuffer(make([]byte, conf.UploadSize))),
-							}
-							s := time.Now()
-							// send request
-							_, http_err := client.Do(&req)
-							e := time.Now()
-							if http_err != nil {
-								upload_latency = "Failed"
-							} else {
-								upload_latency = fmt.Sprintf("%d", e.UnixMilli()-s.UnixMilli())
-							}
-						}
-						rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, upload_latency)
-						color.Green("%s", rep)
-						ch <- rep
-					} else {
-						color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
 					}
 				}
 				ch <- "end"
@@ -324,126 +315,112 @@ func main() {
 						minrtt = pinger.Statistics().MinRtt
 					}
 
-					// generate http req
-					req := http.Request{Method: "GET", URL: &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
-					req.Header = maps.Clone(conf.Headers)
-					req.Header.Set("Host", conf.Hostname)
-					if conf.Padding {
-						req.Header.Set("Cookie", genPadding(conf.PaddingSize))
-					}
+					for _, port := range conf.Ports {
+						ip := fmt.Sprintf("%s:%d", ip, port)
+						// generate http req
+						req := http.Request{Method: "GET", URL: &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
+						req.Header = maps.Clone(conf.Headers)
+						req.Header.Set("Host", conf.Hostname)
+						if conf.Padding {
+							req.Header.Set("Cookie", genPadding(conf.PaddingSize))
+						}
 
-					var client *http.Client
-					if conf.Scheme == "https" {
-						if conf.HTTP3 {
-							tconf := tls.Config{ServerName: conf.SNI, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
-							qconf := quic.Config{
-								InitialConnectionReceiveWindow: 1024 * 8,
-								InitialStreamReceiveWindow:     1024 * 8,
-							}
-							h3wraper := http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
-							client = &http.Client{
-								Transport: &h3wraper,
+						var client *http.Client
+						if conf.Scheme == "https" {
+							if conf.HTTP3 {
+								tconf := tls.Config{ServerName: conf.SNI, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
+								qconf := quic.Config{
+									InitialConnectionReceiveWindow: 1024 * 8,
+									InitialStreamReceiveWindow:     1024 * 8,
+								}
+								h3wraper := http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
+								client = &http.Client{
+									Transport: &h3wraper,
+								}
+							} else {
+								if conf.Utls.Enable {
+									h2 := http2.Transport{
+										MaxHeaderListSize: 1024 * 8,
+										MaxReadFrameSize:  1024 * 16,
+										DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
+											dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(localMaxlatency))
+											if err != nil {
+												return nil, err
+											}
+
+											config := utls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}
+											uTlsConn := utls.UClient(dialConn, &config, fingerprint)
+											handshake_e := uTlsConn.HandshakeContext(ctx)
+											if handshake_e != nil {
+												return nil, handshake_e
+											}
+											return uTlsConn, nil
+										},
+									}
+
+									client = &http.Client{
+										Transport: &h2,
+									}
+								} else {
+									client = &http.Client{Transport: &tr}
+								}
 							}
 						} else {
-							if conf.Utls.Enable {
-								h2 := http2.Transport{
-									MaxHeaderListSize: 1024 * 8,
-									MaxReadFrameSize:  1024 * 16,
-									DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
-										dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(localMaxlatency))
-										if err != nil {
-											return nil, err
-										}
-
-										config := utls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}
-										uTlsConn := utls.UClient(dialConn, &config, fingerprint)
-										handshake_e := uTlsConn.HandshakeContext(ctx)
-										if handshake_e != nil {
-											return nil, handshake_e
-										}
-										return uTlsConn, nil
-									},
-								}
-
-								client = &http.Client{
-									Transport: &h2,
-								}
-							} else {
-								client = &http.Client{Transport: &tr}
-							}
+							client = http.DefaultClient
 						}
-					} else {
-						client = http.DefaultClient
-					}
 
-					client.Timeout = time.Millisecond * time.Duration(localMaxlatency)
-					s := time.Now()
-					// send request
-					respone, http_err := client.Do(&req)
-					e := time.Now()
-					latency := e.UnixMilli() - s.UnixMilli()
-					if http_err != nil {
-						color.Red("%s", http_err.Error())
-						continue
-					}
+						client.Timeout = time.Millisecond * time.Duration(localMaxlatency)
+						s := time.Now()
+						// send request
+						respone, http_err := client.Do(&req)
+						e := time.Now()
+						latency := e.UnixMilli() - s.UnixMilli()
+						if http_err != nil {
+							color.Red("%s", http_err.Error())
+							continue
+						}
 
-					if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, conf.ResponseHeader) {
-						if conf.DynamicLatency {
-							localMaxlatency = (localMaxlatency + latency) / 2
-						}
-						// Calc jiiter
-						jitter_str := ""
-						upload_latency := ""
-						if conf.Jitter {
-							latencies := []float64{}
-							jammed := false
-							for range 5 {
-								s := time.Now()
-								// send request
-								_, http_err := client.Do(&req)
-								e := time.Now()
-								latency := e.UnixMilli() - s.UnixMilli()
-								if http_err != nil {
-									jammed = true
-									break
+						if (respone.StatusCode == 200 || respone.StatusCode == 204) && match(respone.Header, conf.ResponseHeader) {
+							if conf.DynamicLatency {
+								localMaxlatency = (localMaxlatency + latency) / 2
+							}
+							// Calc jiiter
+							jitter_str := ""
+							if conf.Jitter {
+								latencies := []float64{}
+								jammed := false
+								for range 5 {
+									s := time.Now()
+									// send request
+									_, http_err := client.Do(&req)
+									e := time.Now()
+									latency := e.UnixMilli() - s.UnixMilli()
+									if http_err != nil {
+										jammed = true
+										break
+									}
+									latencies = append(latencies, float64(latency))
+									if conf.JitterInterval > 0 {
+										time.Sleep(time.Millisecond * time.Duration(conf.JitterInterval))
+									}
 								}
-								latencies = append(latencies, float64(latency))
-								if conf.JitterInterval > 0 {
-									time.Sleep(time.Millisecond * time.Duration(conf.JitterInterval))
+								if jammed {
+									color.Red("%s\t%s\t%d\tJAMMED\n", ip, minrtt, latency)
+									continue
 								}
+								jitter := Calc_jitter(latencies)
+								if jitter > conf.MaxJitter {
+									color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
+									continue
+								}
+								jitter_str = fmt.Sprintf("\t%f", jitter)
 							}
-							if jammed {
-								color.Red("%s\t%s\t%d\tJAMMED\n", ip, minrtt, latency)
-								continue
-							}
-							jitter := Calc_jitter(latencies)
-							if jitter > conf.MaxJitter {
-								color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
-								continue
-							}
-							jitter_str = fmt.Sprintf("\t%f", jitter)
+							rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, minrtt, latency, jitter_str)
+							color.Green("%s", rep)
+							res_Ch <- rep
+						} else {
+							color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
 						}
-						if conf.Upload {
-							req := http.Request{
-								Method: "POST",
-								URL:    &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path},
-								Host:   conf.Hostname, Body: io.NopCloser(bytes.NewBuffer(make([]byte, conf.UploadSize))),
-							}
-							s := time.Now()
-							// send request
-							_, http_err := client.Do(&req)
-							e := time.Now()
-							if http_err != nil {
-								upload_latency = "Failed"
-							} else {
-								upload_latency = fmt.Sprintf("%d", e.UnixMilli()-s.UnixMilli())
-							}
-						}
-						rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, upload_latency)
-						color.Green("%s", rep)
-						res_Ch <- rep
-					} else {
-						color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
 					}
 				}
 			}()
