@@ -21,7 +21,7 @@
 	"Goroutines": 4,
 	"Scans": 6000,
 	"Maxlatency": 1000,
-	"DynamicLatency": true,
+	"DynamicLatency": false,
 	"Jitter": true,
 	"MaxJitter": 20,
 	"JitterInterval": 200,
@@ -32,5 +32,6 @@
 	"HTTP/3": false,
 	"Method": "random",
 	"Padding": true,
-	"PaddingSize": "50-500"
+	"PaddingSize": "50-500",
+	"CSV": false
 }

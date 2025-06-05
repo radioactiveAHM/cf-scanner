@@ -58,6 +58,7 @@ type Conf struct {
 	Method         string              `json:"Method"`
 	Padding        bool                `json:"Padding"`
 	PaddingSize    string              `json:"PaddingSize"`
+	CSV            bool                `json:"CSV"`
 }
 
 func main() {
@@ -144,7 +145,7 @@ func main() {
 							continue
 						}
 
-						minrtt = pinger.Statistics().MinRtt
+						minrtt = pinger.Statistics().AvgRtt
 					}
 
 					for _, port := range conf.Ports {
@@ -216,7 +217,7 @@ func main() {
 								localMaxlatency = (localMaxlatency + latency) / 2
 							}
 							// Calc jiiter
-							jitter_str := ""
+							jitter_str := "Null"
 							if conf.Jitter {
 								latencies := []float64{}
 								jammed := false
@@ -244,11 +245,15 @@ func main() {
 									color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
 									continue
 								}
-								jitter_str = fmt.Sprintf("\t%f", jitter)
+								jitter_str = fmt.Sprintf("%f", jitter)
 							}
 							rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, minrtt, latency, jitter_str)
 							color.Green("%s", rep)
-							ch <- rep
+							if conf.CSV {
+								ch <- fmt.Sprintf("%s,%s,%d,%s\n", ip, minrtt, latency, jitter_str)
+							} else {
+								ch <- rep
+							}
 						} else {
 							color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
 						}
@@ -258,7 +263,7 @@ func main() {
 			}()
 		}
 
-		file, _ := os.OpenFile("result.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		file := resultFile(conf.CSV)
 		defer file.Close()
 
 		deadgoroutines := 0
@@ -312,7 +317,7 @@ func main() {
 							continue
 						}
 
-						minrtt = pinger.Statistics().MinRtt
+						minrtt = pinger.Statistics().AvgRtt
 					}
 
 					for _, port := range conf.Ports {
@@ -385,7 +390,7 @@ func main() {
 								localMaxlatency = (localMaxlatency + latency) / 2
 							}
 							// Calc jiiter
-							jitter_str := ""
+							jitter_str := "0"
 							if conf.Jitter {
 								latencies := []float64{}
 								jammed := false
@@ -413,11 +418,15 @@ func main() {
 									color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
 									continue
 								}
-								jitter_str = fmt.Sprintf("\t%f", jitter)
+								jitter_str = fmt.Sprintf("%f", jitter)
 							}
 							rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, minrtt, latency, jitter_str)
 							color.Green("%s", rep)
-							res_Ch <- rep
+							if conf.CSV {
+								res_Ch <- fmt.Sprintf("%s,%s,%d,%s\n", ip, minrtt, latency, jitter_str)
+							} else {
+								res_Ch <- rep
+							}
 						} else {
 							color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
 						}
@@ -428,7 +437,7 @@ func main() {
 
 		// result handler
 		go func() {
-			file, _ := os.OpenFile("result.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+			file := resultFile(conf.CSV)
 			defer file.Close()
 
 			for {
@@ -446,6 +455,7 @@ func main() {
 				ip_ch <- strings.Replace(strings.TrimSpace(iprange), "0/24", strconv.Itoa(n4), 1)
 			}
 		}
+		time.Sleep(time.Second * 3)
 	}
 }
 
@@ -506,4 +516,28 @@ func genPadding(r string) string {
 	randomNumber := rand.Intn(b-a+1) + a
 
 	return strings.Repeat("X", randomNumber)
+}
+
+func resultFile(csv bool) *os.File {
+	if csv {
+		will_be_created := false
+		_, exist := os.Stat("result.csv")
+		if exist != nil {
+			will_be_created = true
+		}
+		csv_file, err := os.OpenFile("result.csv", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if will_be_created {
+			csv_file.Write([]byte("ip:port,ping,latency,jitter\n"))
+		}
+		return csv_file
+	} else {
+		file, err := os.OpenFile("result.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		return file
+	}
 }

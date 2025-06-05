@@ -52,7 +52,7 @@ go build -ldflags "-w -s"
  "Goroutines": 4, // Number of concurrent goroutines for scanning.
  "Scans": 6000, // Total number of scans to perform.
  "Maxlatency": 1000, // Maximum acceptable latency (in milliseconds).
- "DynamicLatency": true, // Dynamically updates MaxLatency to an average latency during runtime.
+ "DynamicLatency": false, // Dynamically updates MaxLatency to an average latency during runtime.
  "Jitter": true, // Enable jitter calculation.
  "MaxJitter": 20, // Acceptable jitter.
  "JitterInterval": 200, // Sleep time interval between jitter calculations (in milliseconds).
@@ -63,6 +63,7 @@ go build -ldflags "-w -s"
  "HTTP/3": false, // Use HTTP version 3 or not.
  "Method": "random", // Scanning method. Values can be random or linear.
  "Padding": true, // Enable padding in HTTP requests by adding random text as cookies. This helps eliminate fixed-size requests, enhancing security and privacy.
- "PaddingSize": "5-500" // Padding size range.
+ "PaddingSize": "5-500", // Padding size range.
+ "CSV": false // CSV format result
 }
 ```
