@@ -97,12 +97,12 @@ func main() {
 
 				// Load IP list file
 				file, _ := os.ReadFile(conf.IplistPath)
+				ranges := strings.Split(string(file), "\n")
 				localMaxlatency := conf.Maxlatency
 				for range conf.Scans {
 					ip := ""
 					// pick an ip
 					if conf.IpVersion == "v4" {
-						ranges := strings.Split(string(file), "\n")
 						n4 := strconv.Itoa(rand.Intn(255))
 						randomRange := ranges[rand.Intn(len(ranges))]
 						if randomRange == "" || randomRange == " " || ignore(randomRange, conf.IgnoreRange) {
@@ -112,7 +112,6 @@ func main() {
 						ip = fmt.Sprintf("%s.%s.%s.%s", ip_parts[0], ip_parts[1], ip_parts[2], n4)
 					} else if conf.IpVersion == "v6" {
 						ops := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f", ""}
-						ranges := strings.Split(string(file), "\n")
 						randomRange := ranges[rand.Intn(len(ranges))]
 						if randomRange == "" || randomRange == " " {
 							continue
@@ -283,6 +282,9 @@ func main() {
 			file.Write([]byte(v))
 		}
 	} else if conf.Method == "linear" {
+		if conf.IpVersion != "v4" {
+			log.Fatalln("Linear method is only available for ipv4")
+		}
 		res_Ch := make(chan string)
 		ip_ch := make(chan string)
 
@@ -450,9 +452,13 @@ func main() {
 		}()
 
 		file, _ := os.ReadFile(conf.IplistPath)
-		for _, iprange := range strings.Split(string(file), "\n") {
+		for iprange := range strings.Lines(string(file)) {
+			if iprange == "" || iprange == " " {
+				continue
+			}
 			for n4 := range 256 {
-				ip_ch <- strings.Replace(strings.TrimSpace(iprange), "0/24", strconv.Itoa(n4), 1)
+				ip_parts := strings.Split(strings.TrimSpace(iprange), ".")
+				ip_ch <- fmt.Sprintf("%s.%s.%s.%d", ip_parts[0], ip_parts[1], ip_parts[2], n4)
 			}
 		}
 		time.Sleep(time.Second * 3)
