@@ -30,7 +30,10 @@
 	"IplistPath": "ipv4.txt",
 	"IgnoreRange": ["104", "172"],
 	"HTTP/3": false,
-	"Method": "random",
+	"LinearScan": {
+		"Enable": false,
+		"N4": 256
+	},
 	"Padding": true,
 	"PaddingSize": "50-500",
 	"CSV": false

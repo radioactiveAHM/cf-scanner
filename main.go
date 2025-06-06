@@ -31,6 +31,11 @@ type UtlsConfig struct {
 	Fingerprint string `json:"Fingerprint"`
 }
 
+type Linear struct {
+	Enable bool `json:"Enable"`
+	N4     int  `json:"N4"`
+}
+
 type Conf struct {
 	Hostname       string              `json:"Hostname"`
 	Ports          []int               `json:"Ports"`
@@ -55,7 +60,7 @@ type Conf struct {
 	IplistPath     string              `json:"IplistPath"`
 	IgnoreRange    []string            `json:"IgnoreRange"`
 	HTTP3          bool                `json:"HTTP/3"`
-	Method         string              `json:"Method"`
+	LinearScan     Linear              `json:"LinearScan"`
 	Padding        bool                `json:"Padding"`
 	PaddingSize    string              `json:"PaddingSize"`
 	CSV            bool                `json:"CSV"`
@@ -88,7 +93,7 @@ func main() {
 
 	log.Println("Starting Scanner ->")
 
-	if conf.Method == "random" {
+	if !conf.LinearScan.Enable {
 		ch := make(chan string)
 		for range conf.Goroutines {
 			go func() {
@@ -281,7 +286,7 @@ func main() {
 			}
 			file.Write([]byte(v))
 		}
-	} else if conf.Method == "linear" {
+	} else {
 		if conf.IpVersion != "v4" {
 			log.Fatalln("Linear method is only available for ipv4")
 		}
@@ -456,7 +461,7 @@ func main() {
 			if iprange == "" || iprange == " " {
 				continue
 			}
-			for n4 := range 256 {
+			for n4 := range conf.LinearScan.N4 {
 				ip_parts := strings.Split(strings.TrimSpace(iprange), ".")
 				ip_ch <- fmt.Sprintf("%s.%s.%s.%d", ip_parts[0], ip_parts[1], ip_parts[2], n4)
 			}
