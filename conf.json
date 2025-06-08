@@ -31,7 +31,7 @@
 	"IgnoreRange": ["104", "172"],
 	"HTTP/3": false,
 	"LinearScan": {
-		"Enable": true,
+		"Enable": false,
 		"N3": null,
 		"N4": 256
 	},
