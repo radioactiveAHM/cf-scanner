@@ -33,6 +33,7 @@ type UtlsConfig struct {
 
 type Linear struct {
 	Enable bool `json:"Enable"`
+	N3     int  `json:"N3"`
 	N4     int  `json:"N4"`
 }
 
@@ -461,9 +462,19 @@ func main() {
 			if iprange == "" || iprange == " " {
 				continue
 			}
-			for n4 := range conf.LinearScan.N4 {
-				ip_parts := strings.Split(strings.TrimSpace(iprange), ".")
-				ip_ch <- fmt.Sprintf("%s.%s.%s.%d", ip_parts[0], ip_parts[1], ip_parts[2], n4)
+			if conf.LinearScan.N3 > 0 {
+				// With N3
+				for n3 := range conf.LinearScan.N3 {
+					for n4 := range conf.LinearScan.N4 {
+						ip_parts := strings.Split(strings.TrimSpace(iprange), ".")
+						ip_ch <- fmt.Sprintf("%s.%s.%d.%d", ip_parts[0], ip_parts[1], n3, n4)
+					}
+				}
+			} else {
+				for n4 := range conf.LinearScan.N4 {
+					ip_parts := strings.Split(strings.TrimSpace(iprange), ".")
+					ip_ch <- fmt.Sprintf("%s.%s.%s.%d", ip_parts[0], ip_parts[1], ip_parts[2], n4)
+				}
 			}
 		}
 		time.Sleep(time.Second * 3)
