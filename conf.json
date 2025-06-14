@@ -28,7 +28,7 @@
 	"Alpn": ["http/1.1"],
 	"IpVersion": "v4",
 	"IplistPath": "ipv4.txt",
-	"IgnoreRange": ["104", "172"],
+	"IgnoreRange": [],
 	"HTTP/3": false,
 	"LinearScan": {
 		"Enable": false,
@@ -36,6 +36,6 @@
 		"N4": 256
 	},
 	"Padding": true,
-	"PaddingSize": "50-500",
+	"PaddingSize": "1-500",
 	"CSV": false
 }
