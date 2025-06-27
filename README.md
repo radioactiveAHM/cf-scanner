@@ -6,7 +6,9 @@
 
 [Русский учебник](/tutorial/RU.md)
 
-Cloudflare IP scanner
+Cloudflare scanner
+
+***This scanner can be used with any CDN, provided you have the necessary requirements, such as an IP list or domain list for scanning. By default, it is configured to target Cloudflare.***
 
 ## Build
 
@@ -34,17 +36,18 @@ go build -ldflags "-w -s"
  "Ports": [], // If empty, defaults to port 443 for HTTPS and 80 for HTTP.
  "Path": "/", // The path to append to the hostname.
  "Headers": { // Additional HTTP headers.
-  "User-Agent": ["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0)"],
-  "Accept-Encoding": ["gzip", "br"]
+    "User-Agent": ["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0)"],
+    "Accept-Encoding": ["gzip", "br"]
  },
  "ResponseHeader": { // Headers that an HTTP response must include.
-  "Server": "cloudflare"
+    "Server": "cloudflare"
  },
+ "ResponseStatusCode": [200, 204], // Acceptable status codes.
  "SNI": "cp.cloudflare.com", // The SNI value to use during the TLS handshake.
  "Insecure": false, // Certificate validation.
  "Utls": { // Enable UTLS fingerprint. Supported fingerprints are firefox, edge, chrome, 360 and ios.
-  "Enable": true,
-  "Fingerprint": "firefox"
+    "Enable": true,
+    "Fingerprint": "firefox"
  },
  "Scheme": "https", // The protocol scheme (http or https).
  "Ping": true, // Enable ping IP.
@@ -59,9 +62,21 @@ go build -ldflags "-w -s"
  "Alpn": ["http/1.1"], // List of supported ALPN (Application-Layer Protocol Negotiation) protocols.
  "IpVersion": "v4", // IP version (`v4` or `v6`).
  "IplistPath": "ipv4.txt", // Path to the file containing a list of IP addresses (e.g., `ipv4.txt`).
- "IgnoreRange": ["104", "172"], // List of octets where each IP matching the first octet will be ignored.
+ "IgnoreRange": [], // List of octets where each IP matching the first octet will be ignored. (e.g., `["172", "104"]`).
  "HTTP/3": false, // Use HTTP version 3 or not.
- "Method": "random", // Scanning method. Values can be random or linear.
+ "LinearScan": {
+    "Enable": false, // Enable linear scanning.            104.17.178.0
+    "N3": null, // Max 3Th octet of IP.                            |  |
+    "N4": 256 // Max 4Th octet of IP.                             N3  N4
+ },
+  "DomainScan": {
+    "Enable": false, // Enable domain scanning.
+    "DomainAsSNI": false, // Use selected domain as SNI.
+    "DomainAsHost": false, // Use selected domain as Host.
+    "Shuffle": true, // Shuffle domains list for random scanning.
+    "SkipIPV6": true, // Skip IPv6 as result of resolving domain.
+    "DomainListPath": "cloudfalare-domains.txt" // Path to the file containing a list of domains
+ },
  "Padding": true, // Enable padding in HTTP requests by adding random text as cookies. This helps eliminate fixed-size requests, enhancing security and privacy.
  "PaddingSize": "5-500", // Padding size range.
  "CSV": false // CSV format result

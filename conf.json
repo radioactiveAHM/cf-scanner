@@ -9,6 +9,7 @@
 	"ResponseHeader": {
 		"Server": "cloudflare"
 	},
+	"ResponseStatusCode": [200, 204],
 	"SNI": "cp.cloudflare.com",
 	"Insecure": false,
 	"Utls": {
@@ -18,7 +19,7 @@
 	"Scheme": "https",
 	"Ping": true,
 	"MaxPing": 200,
-	"Goroutines": 4,
+	"Goroutines": 8,
 	"Scans": 6000,
 	"Maxlatency": 1000,
 	"DynamicLatency": false,
@@ -34,6 +35,14 @@
 		"Enable": false,
 		"N3": null,
 		"N4": 256
+	},
+	"DomainScan": {
+		"Enable": false,
+		"DomainAsSNI": false,
+		"DomainAsHost": false,
+		"Shuffle": true,
+		"SkipIPV6": true,
+		"DomainListPath": "cloudfalare-domains.txt"
 	},
 	"Padding": true,
 	"PaddingSize": "1-500",
