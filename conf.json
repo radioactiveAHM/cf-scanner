@@ -30,6 +30,12 @@
 	"IplistPath": "ipv4.txt",
 	"IgnoreRange": [],
 	"HTTP/3": false,
+	"Noise": {
+		"Enable": false,
+		"Packet": "Meow",
+		"Sleep": 500,
+		"Base64": false
+	},
 	"LinearScan": {
 		"Enable": false,
 		"N3": null,

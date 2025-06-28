@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -47,6 +48,13 @@ type DS struct {
 	DomainListPath string `json:"DomainListPath"`
 }
 
+type NoiseConfig struct {
+	Enable bool   `json:"Enable"`
+	Packet string `json:"Packet"`
+	Sleep  int    `json:"Sleep"`
+	Base64 bool   `json:"Base64"`
+}
+
 type Conf struct {
 	Hostname           string              `json:"Hostname"`
 	Ports              []int               `json:"Ports"`
@@ -72,6 +80,7 @@ type Conf struct {
 	IplistPath         string              `json:"IplistPath"`
 	IgnoreRange        []string            `json:"IgnoreRange"`
 	HTTP3              bool                `json:"HTTP/3"`
+	Noise              NoiseConfig         `json:"Noise"`
 	LinearScan         Linear              `json:"LinearScan"`
 	DomainScan         DS                  `json:"DomainScan"`
 	Padding            bool                `json:"Padding"`
@@ -187,9 +196,42 @@ func main() {
 										InitialConnectionReceiveWindow: 1024 * 8,
 										InitialStreamReceiveWindow:     1024 * 8,
 									}
-									h3wraper := http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
+									var h3tr http3.Transport
+									if conf.Noise.Enable {
+										h3tr = http3.Transport{
+											TLSClientConfig: &tconf, QUICConfig: &qconf,
+											Dial: func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
+												udp, udpErr := net.ListenPacket("udp", "0.0.0.0:0")
+												if udpErr != nil {
+													return nil, udpErr
+												}
+												uaddr, uaddrErr := net.ResolveUDPAddr("udp", addr)
+												if uaddrErr != nil {
+													return nil, uaddrErr
+												}
+												// noise
+												var packet []byte
+												if conf.Noise.Base64 {
+													decoded, bs4Err := base64.StdEncoding.DecodeString(conf.Noise.Packet)
+													if bs4Err != nil {
+														log.Fatalln(bs4Err)
+													}
+													packet = decoded
+												} else {
+													packet = []byte(conf.Noise.Packet)
+												}
+												udp.WriteTo(packet, uaddr)
+												time.Sleep(time.Millisecond * time.Duration(conf.Noise.Sleep))
+												return quic.Dial(
+													ctx, udp, uaddr, tlsCfg, cfg,
+												)
+											},
+										}
+									} else {
+										h3tr = http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
+									}
 									client = &http.Client{
-										Transport: &h3wraper,
+										Transport: &h3tr,
 									}
 								} else {
 									if conf.Utls.Enable {
@@ -362,9 +404,42 @@ func main() {
 										InitialConnectionReceiveWindow: 1024 * 8,
 										InitialStreamReceiveWindow:     1024 * 8,
 									}
-									h3wraper := http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
+									var h3tr http3.Transport
+									if conf.Noise.Enable {
+										h3tr = http3.Transport{
+											TLSClientConfig: &tconf, QUICConfig: &qconf,
+											Dial: func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
+												udp, udpErr := net.ListenPacket("udp", "0.0.0.0:0")
+												if udpErr != nil {
+													return nil, udpErr
+												}
+												uaddr, uaddrErr := net.ResolveUDPAddr("udp", addr)
+												if uaddrErr != nil {
+													return nil, uaddrErr
+												}
+												// noise
+												var packet []byte
+												if conf.Noise.Base64 {
+													decoded, bs4Err := base64.StdEncoding.DecodeString(conf.Noise.Packet)
+													if bs4Err != nil {
+														log.Fatalln(bs4Err)
+													}
+													packet = decoded
+												} else {
+													packet = []byte(conf.Noise.Packet)
+												}
+												udp.WriteTo(packet, uaddr)
+												time.Sleep(time.Millisecond * time.Duration(conf.Noise.Sleep))
+												return quic.Dial(
+													ctx, udp, uaddr, tlsCfg, cfg,
+												)
+											},
+										}
+									} else {
+										h3tr = http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
+									}
 									client = &http.Client{
-										Transport: &h3wraper,
+										Transport: &h3tr,
 									}
 								} else {
 									if conf.Utls.Enable {
@@ -578,9 +653,42 @@ func main() {
 										InitialConnectionReceiveWindow: 1024 * 8,
 										InitialStreamReceiveWindow:     1024 * 8,
 									}
-									h3wraper := http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
+									var h3tr http3.Transport
+									if conf.Noise.Enable {
+										h3tr = http3.Transport{
+											TLSClientConfig: &tconf, QUICConfig: &qconf,
+											Dial: func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
+												udp, udpErr := net.ListenPacket("udp", "0.0.0.0:0")
+												if udpErr != nil {
+													return nil, udpErr
+												}
+												uaddr, uaddrErr := net.ResolveUDPAddr("udp", addr)
+												if uaddrErr != nil {
+													return nil, uaddrErr
+												}
+												// noise
+												var packet []byte
+												if conf.Noise.Base64 {
+													decoded, bs4Err := base64.StdEncoding.DecodeString(conf.Noise.Packet)
+													if bs4Err != nil {
+														log.Fatalln(bs4Err)
+													}
+													packet = decoded
+												} else {
+													packet = []byte(conf.Noise.Packet)
+												}
+												udp.WriteTo(packet, uaddr)
+												time.Sleep(time.Millisecond * time.Duration(conf.Noise.Sleep))
+												return quic.Dial(
+													ctx, udp, uaddr, tlsCfg, cfg,
+												)
+											},
+										}
+									} else {
+										h3tr = http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
+									}
 									client = &http.Client{
-										Transport: &h3wraper,
+										Transport: &h3tr,
 									}
 								} else {
 									if conf.Utls.Enable {

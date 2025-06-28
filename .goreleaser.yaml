@@ -29,6 +29,7 @@ archives:
       - conf.json
       - ipv4.txt
       - ipv6.txt
+      - cloudfalare-domains.txt
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}_
