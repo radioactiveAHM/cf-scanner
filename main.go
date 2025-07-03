@@ -55,6 +55,13 @@ type NoiseConfig struct {
 	Base64 bool   `json:"Base64"`
 }
 
+type DownloadConfig struct {
+	Enable  bool   `json:"Enable"`
+	Url     string `json:"Url"`
+	MinData int    `json:"MinData"`
+	MaxData int    `json:"MaxData"`
+}
+
 type Conf struct {
 	Hostname           string              `json:"Hostname"`
 	Ports              []int               `json:"Ports"`
@@ -86,6 +93,7 @@ type Conf struct {
 	Padding            bool                `json:"Padding"`
 	PaddingSize        string              `json:"PaddingSize"`
 	CSV                bool                `json:"CSV"`
+	DownloadTest       DownloadConfig      `json:"DownloadTest"`
 }
 
 func main() {
@@ -281,6 +289,7 @@ func main() {
 								}
 								// Calc jiiter
 								jitter_str := "Null"
+								download_test := "Null"
 								if conf.Jitter {
 									latencies := []float64{}
 									jammed := false
@@ -310,10 +319,13 @@ func main() {
 									}
 									jitter_str = fmt.Sprintf("%f", jitter)
 								}
-								rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, minrtt, latency, jitter_str)
+								if conf.DownloadTest.Enable {
+									download_test = downloadTest(&conf, ip)
+								}
+								rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, download_test)
 								color.Green("%s", rep)
 								if conf.CSV {
-									ch <- fmt.Sprintf("%s,%s,%d,%s\n", ip, minrtt, latency, jitter_str)
+									ch <- fmt.Sprintf("%s,%s,%d,%s,%s\n", ip, minrtt, latency, jitter_str, download_test)
 								} else {
 									ch <- rep
 								}
@@ -489,7 +501,8 @@ func main() {
 									localMaxlatency = (localMaxlatency + latency) / 2
 								}
 								// Calc jiiter
-								jitter_str := "0"
+								jitter_str := "Null"
+								download_test := "Null"
 								if conf.Jitter {
 									latencies := []float64{}
 									jammed := false
@@ -519,10 +532,13 @@ func main() {
 									}
 									jitter_str = fmt.Sprintf("%f", jitter)
 								}
-								rep := fmt.Sprintf("%s\t%s\t%d\t%s\n", ip, minrtt, latency, jitter_str)
+								if conf.DownloadTest.Enable {
+									download_test = downloadTest(&conf, ip)
+								}
+								rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, download_test)
 								color.Green("%s", rep)
 								if conf.CSV {
-									res_Ch <- fmt.Sprintf("%s,%s,%d,%s\n", ip, minrtt, latency, jitter_str)
+									res_Ch <- fmt.Sprintf("%s,%s,%d,%s,%s\n", ip, minrtt, latency, jitter_str, download_test)
 								} else {
 									res_Ch <- rep
 								}
@@ -562,9 +578,13 @@ func main() {
 						}
 					}
 				} else {
-					for n4 := range conf.LinearScan.N4 {
-						ip_parts := strings.Split(strings.TrimSpace(iprange), ".")
-						ip_ch <- fmt.Sprintf("%s.%s.%s.%d", ip_parts[0], ip_parts[1], ip_parts[2], n4)
+					if conf.LinearScan.N4 == 0 {
+						ip_ch <- strings.TrimSpace(iprange)
+					} else {
+						for n4 := range conf.LinearScan.N4 {
+							ip_parts := strings.Split(strings.TrimSpace(iprange), ".")
+							ip_ch <- fmt.Sprintf("%s.%s.%s.%d", ip_parts[0], ip_parts[1], ip_parts[2], n4)
+						}
 					}
 				}
 			}
@@ -739,6 +759,7 @@ func main() {
 								}
 								// Calc jiiter
 								jitter_str := "Null"
+								download_test := "Null"
 								if conf.Jitter {
 									latencies := []float64{}
 									jammed := false
@@ -768,10 +789,13 @@ func main() {
 									}
 									jitter_str = fmt.Sprintf("%f", jitter)
 								}
-								rep := fmt.Sprintf("%s(%s)\t%s\t%d\t%s\n", domain, ip, minrtt, latency, jitter_str)
-								color.Green(rep)
+								if conf.DownloadTest.Enable {
+									download_test = downloadTest(&conf, ip)
+								}
+								rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, download_test)
+								color.Green("%s", rep)
 								if conf.CSV {
-									ch <- fmt.Sprintf("%s(%s),%s,%d,%s\n", domain, ip, minrtt, latency, jitter_str)
+									ch <- fmt.Sprintf("%s,%s,%d,%s,%s\n", ip, minrtt, latency, jitter_str, download_test)
 								} else {
 									ch <- rep
 								}
@@ -877,7 +901,7 @@ func resultFile(csv bool) *os.File {
 			log.Fatalln(err)
 		}
 		if will_be_created {
-			csv_file.Write([]byte("ip:port,ping,latency,jitter\n"))
+			csv_file.Write([]byte("ip:port,ping,latency,jitter,download\n"))
 		}
 		return csv_file
 	} else {

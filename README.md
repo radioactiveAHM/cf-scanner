@@ -30,6 +30,12 @@ go build -ldflags "-w -s"
 
 ## Configuration Parameters
 
+- If both `N3` and `N4` are set to null, the IPs listed in `IplistPath` will be scanned line by line, as-is.
+
+> [!WARNING]
+> If DownloadTest is enabled, use only one Goroutine; running multiple will yield inaccurate results.
+> If Utls is enabled, HTTP/2 will be used.
+
 ```json
 {
  "Hostname": "cp.cloudflare.com", // The target hostname or domain to scan.
@@ -52,7 +58,7 @@ go build -ldflags "-w -s"
  "Scheme": "https", // The protocol scheme (http or https).
  "Ping": true, // Enable ping IP.
  "MaxPing": 200, // Maximum acceptable ping time (in milliseconds).
- "Goroutines": 4, // Number of concurrent goroutines for scanning.
+ "Goroutines": 8, // Number of concurrent goroutines for scanning.
  "Scans": 6000, // Total number of scans to perform.
  "Maxlatency": 1000, // Maximum acceptable latency (in milliseconds).
  "DynamicLatency": false, // Dynamically updates MaxLatency to an average latency during runtime.
@@ -64,6 +70,12 @@ go build -ldflags "-w -s"
  "IplistPath": "ipv4.txt", // Path to the file containing a list of IP addresses (e.g., `ipv4.txt`).
  "IgnoreRange": [], // List of octets where each IP matching the first octet will be ignored. (e.g., `["172", "104"]`).
  "HTTP/3": false, // Use HTTP version 3 or not.
+ "Noise": {
+    "Enable": false, // Enable UDP noise injection for HTTP/3.
+    "Packet": "Meow", // Noise payload to send.
+    "Sleep": 500, // Delay in milliseconds after sending noise.
+    "Base64": false // Interpret 'Packet' as raw string (false) or base64-encoded bytes (true).
+ },
  "LinearScan": {
     "Enable": false, // Enable linear scanning.            104.17.178.0
     "N3": null, // Max 3Th octet of IP.                            |  |
@@ -79,6 +91,12 @@ go build -ldflags "-w -s"
  },
  "Padding": true, // Enable padding in HTTP requests by adding random text as cookies. This helps eliminate fixed-size requests, enhancing security and privacy.
  "PaddingSize": "5-500", // Padding size range.
- "CSV": false // CSV format result
+ "CSV": false, // CSV format result.
+ "DownloadTest": {
+    "Enable": false, // Enable the download speed test.
+    "Url": "https://speed.cloudflare.com/__down?bytes=10000000", // Target URL for download.
+    "MinData": 100000, // Minimum data (in bytes) required; otherwise, mark as JAMMED.
+    "MaxData": 5000000 // Maximum data (in bytes) allowed to be received.
+ }
 }
 ```

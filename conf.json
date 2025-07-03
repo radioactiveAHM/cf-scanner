@@ -51,5 +51,11 @@
 	},
 	"Padding": true,
 	"PaddingSize": "1-500",
-	"CSV": false
+	"CSV": false,
+	"DownloadTest": {
+		"Enable": false,
+		"Url": "https://speed.cloudflare.com/__down?bytes=10000000",
+		"MinData": 100000,
+		"MaxData": 5000000
+	}
 }
