@@ -30,11 +30,14 @@ go build -ldflags "-w -s"
 
 ## Configuration Parameters
 
-- If both `N3` and `N4` are set to null, the IPs listed in `IplistPath` will be scanned line by line, as-is.
-
+> [!NOTE]
+> If both `N3` and `N4` are set to null, the IPs listed in `IplistPath` will be scanned line by line, as-is.
 > [!WARNING]
 > If DownloadTest is enabled, use only one Goroutine; running multiple will yield inaccurate results.
+> [!WARNING]
 > If Utls is enabled, HTTP/2 will be used.
+> [!CAUTION]
+> Avoid using your own domain for scanning activities, as CDN providers may interpret the traffic as DDoS or port scanning behavior and block your domain.
 
 ```json
 {
