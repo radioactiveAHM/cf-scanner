@@ -56,10 +56,10 @@ type NoiseConfig struct {
 }
 
 type DownloadConfig struct {
-	Enable  bool   `json:"Enable"`
-	Url     string `json:"Url"`
-	MinData int    `json:"MinData"`
-	MaxData int    `json:"MaxData"`
+	Enable      bool   `json:"Enable"`
+	Url         string `json:"Url"`
+	TargetBytes int    `json:"TargetBytes"`
+	Timeout     int    `json:"Timeout"`
 }
 
 type Conf struct {

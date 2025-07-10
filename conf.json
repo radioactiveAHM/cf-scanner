@@ -55,7 +55,7 @@
 	"DownloadTest": {
 		"Enable": false,
 		"Url": "https://speed.cloudflare.com/__down?bytes=10000000",
-		"MinData": 100000,
-		"MaxData": 5000000
+		"TargetBytes": 5000000,
+		"Timeout": 5000
 	}
 }

@@ -101,8 +101,8 @@ go build -ldflags "-w -s"
  "DownloadTest": {
     "Enable": false, // Enable the download speed test.
     "Url": "https://speed.cloudflare.com/__down?bytes=10000000", // Target URL for download.
-    "MinData": 100000, // Minimum data (in bytes) required; otherwise, mark as JAMMED.
-    "MaxData": 5000000 // Maximum data (in bytes) allowed to be received.
+    "TargetBytes": 5000000, // Expected data in bytes; if not met, report as JAMMED.
+    "Timeout": 5000 // Timeout duration in milliseconds before aborting the download.
  }
 }
 ```

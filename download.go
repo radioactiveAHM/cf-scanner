@@ -39,29 +39,39 @@ func downloadTest(conf *Conf, ip string) string {
 		return "FAILED"
 	}
 
-	buf := make([]byte, 1024*8)
-	reader := respone.Body
-	defer reader.Close()
-	read := 0
-	start := time.Now()
-	for {
-		if read >= conf.DownloadTest.MaxData {
-			break
+	ch := make(chan string)
+	go func() {
+		buf := make([]byte, 1024*8)
+		reader := respone.Body
+		defer reader.Close()
+		read := 0
+		start := time.Now()
+		for {
+			if read >= conf.DownloadTest.TargetBytes {
+				break
+			}
+			size, readErr := reader.Read(buf)
+			read += size
+			if readErr != nil {
+				break
+			}
 		}
-		size, readErr := reader.Read(buf)
-		read += size
-		if readErr != nil {
-			break
+		elapsed := time.Now()
+
+		if read < conf.DownloadTest.TargetBytes {
+			ch <- "JAMMED"
 		}
+
+		latency := float32(elapsed.UnixMilli()-start.UnixMilli()) / 1000
+
+		bytesPerSecond := float32(read) / latency
+		ch <- fmt.Sprintf("%fMB/S", bytesPerSecond/1000000)
+	}()
+
+	select {
+	case report := <-ch:
+		return report
+	case <-time.After(time.Millisecond * time.Duration(conf.DownloadTest.Timeout)):
+		return "Timeout"
 	}
-	elapsed := time.Now()
-
-	if read < conf.DownloadTest.MinData {
-		return "JAMMED"
-	}
-
-	latency := float32(elapsed.UnixMilli()-start.UnixMilli()) / 1000
-
-	bytesPerSecond := float32(read) / latency
-	return fmt.Sprintf("%fMB/S", bytesPerSecond/1000000)
 }
