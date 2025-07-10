@@ -14,8 +14,12 @@ import (
 func downloadTest(conf *Conf, ip string) string {
 	var client *http.Client
 	if conf.Scheme == "https" {
-		tr := http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: conf.Insecure}}
-		client = &http.Client{Transport: &tr}
+		if conf.HTTP3 {
+			client = h3transporter(conf)
+		} else {
+			tr := http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: conf.Insecure}}
+			client = &http.Client{Transport: &tr}
+		}
 	} else {
 		client = http.DefaultClient
 	}

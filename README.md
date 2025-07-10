@@ -65,7 +65,7 @@ go build -ldflags "-w -s"
  "Ping": true, // Enable ping IP.
  "MaxPing": 200, // Maximum acceptable ping time (in milliseconds).
  "Goroutines": 8, // Number of concurrent goroutines for scanning.
- "Scans": 6000, // Total number of scans to perform.
+ "Scans": 6000, // Total number of scans to perform per goroutine.
  "Maxlatency": 1000, // Maximum acceptable latency (in milliseconds).
  "DynamicLatency": false, // Dynamically updates MaxLatency to an average latency during runtime.
  "Jitter": true, // Enable jitter calculation.

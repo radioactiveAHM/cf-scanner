@@ -128,9 +128,6 @@ func main() {
 			ch := make(chan string)
 			for range conf.Goroutines {
 				go func() {
-					// Transporter for TLS
-					tr := http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: conf.Insecure}}
-
 					// Load IP list file
 					file, ipListFileErr := os.ReadFile(conf.IplistPath)
 					if ipListFileErr != nil {
@@ -138,6 +135,20 @@ func main() {
 					}
 					ranges := strings.Split(string(file), "\n")
 					localMaxlatency := conf.Maxlatency
+					var client *http.Client
+					if conf.Scheme == "https" {
+						if conf.HTTP3 {
+							client = h3transporter(&conf)
+						} else {
+							if conf.Utls.Enable {
+								client = h2transporter(&conf, fingerprint, localMaxlatency)
+							} else {
+								client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: conf.Insecure}}}
+							}
+						}
+					} else {
+						client = http.DefaultClient
+					}
 					for range conf.Scans {
 						ip := ""
 						// pick an ip
@@ -194,82 +205,6 @@ func main() {
 							req.Header.Set("Host", conf.Hostname)
 							if conf.Padding {
 								req.Header.Set("Cookie", genPadding(conf.PaddingSize))
-							}
-
-							var client *http.Client
-							if conf.Scheme == "https" {
-								if conf.HTTP3 {
-									tconf := tls.Config{ServerName: conf.SNI, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
-									qconf := quic.Config{
-										InitialConnectionReceiveWindow: 1024 * 8,
-										InitialStreamReceiveWindow:     1024 * 8,
-									}
-									var h3tr http3.Transport
-									if conf.Noise.Enable {
-										h3tr = http3.Transport{
-											TLSClientConfig: &tconf, QUICConfig: &qconf,
-											Dial: func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
-												udp, udpErr := net.ListenPacket("udp", "0.0.0.0:0")
-												if udpErr != nil {
-													return nil, udpErr
-												}
-												uaddr, uaddrErr := net.ResolveUDPAddr("udp", addr)
-												if uaddrErr != nil {
-													return nil, uaddrErr
-												}
-												// noise
-												var packet []byte
-												if conf.Noise.Base64 {
-													decoded, bs4Err := base64.StdEncoding.DecodeString(conf.Noise.Packet)
-													if bs4Err != nil {
-														log.Fatalln(bs4Err)
-													}
-													packet = decoded
-												} else {
-													packet = []byte(conf.Noise.Packet)
-												}
-												udp.WriteTo(packet, uaddr)
-												time.Sleep(time.Millisecond * time.Duration(conf.Noise.Sleep))
-												return quic.Dial(
-													ctx, udp, uaddr, tlsCfg, cfg,
-												)
-											},
-										}
-									} else {
-										h3tr = http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
-									}
-									client = &http.Client{
-										Transport: &h3tr,
-									}
-								} else {
-									if conf.Utls.Enable {
-										h2 := http2.Transport{
-											MaxHeaderListSize: 1024 * 8,
-											MaxReadFrameSize:  1024 * 16,
-											DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
-												dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(localMaxlatency))
-												if err != nil {
-													return nil, err
-												}
-												config := utls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}
-												uTlsConn := utls.UClient(dialConn, &config, fingerprint)
-												handshake_e := uTlsConn.HandshakeContext(ctx)
-												if handshake_e != nil {
-													return nil, handshake_e
-												}
-												return uTlsConn, nil
-											},
-										}
-
-										client = &http.Client{
-											Transport: &h2,
-										}
-									} else {
-										client = &http.Client{Transport: &tr}
-									}
-								}
-							} else {
-								client = http.DefaultClient
 							}
 
 							client.Timeout = time.Millisecond * time.Duration(localMaxlatency)
@@ -367,9 +302,22 @@ func main() {
 			// scanners
 			for range conf.Goroutines {
 				go func() {
-					// Transporter for TLS
-					tr := http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: conf.Insecure}}
 					localMaxlatency := conf.Maxlatency
+					var client *http.Client
+					if conf.Scheme == "https" {
+						if conf.HTTP3 {
+							client = h3transporter(&conf)
+						} else {
+							if conf.Utls.Enable {
+								client = h2transporter(&conf, fingerprint, localMaxlatency)
+							} else {
+								client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: conf.Insecure}}}
+							}
+						}
+					} else {
+						client = http.DefaultClient
+					}
+
 					for {
 						ip := <-ip_ch
 						// ping ip
@@ -406,83 +354,6 @@ func main() {
 							req.Header.Set("Host", conf.Hostname)
 							if conf.Padding {
 								req.Header.Set("Cookie", genPadding(conf.PaddingSize))
-							}
-
-							var client *http.Client
-							if conf.Scheme == "https" {
-								if conf.HTTP3 {
-									tconf := tls.Config{ServerName: conf.SNI, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
-									qconf := quic.Config{
-										InitialConnectionReceiveWindow: 1024 * 8,
-										InitialStreamReceiveWindow:     1024 * 8,
-									}
-									var h3tr http3.Transport
-									if conf.Noise.Enable {
-										h3tr = http3.Transport{
-											TLSClientConfig: &tconf, QUICConfig: &qconf,
-											Dial: func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
-												udp, udpErr := net.ListenPacket("udp", "0.0.0.0:0")
-												if udpErr != nil {
-													return nil, udpErr
-												}
-												uaddr, uaddrErr := net.ResolveUDPAddr("udp", addr)
-												if uaddrErr != nil {
-													return nil, uaddrErr
-												}
-												// noise
-												var packet []byte
-												if conf.Noise.Base64 {
-													decoded, bs4Err := base64.StdEncoding.DecodeString(conf.Noise.Packet)
-													if bs4Err != nil {
-														log.Fatalln(bs4Err)
-													}
-													packet = decoded
-												} else {
-													packet = []byte(conf.Noise.Packet)
-												}
-												udp.WriteTo(packet, uaddr)
-												time.Sleep(time.Millisecond * time.Duration(conf.Noise.Sleep))
-												return quic.Dial(
-													ctx, udp, uaddr, tlsCfg, cfg,
-												)
-											},
-										}
-									} else {
-										h3tr = http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
-									}
-									client = &http.Client{
-										Transport: &h3tr,
-									}
-								} else {
-									if conf.Utls.Enable {
-										h2 := http2.Transport{
-											MaxHeaderListSize: 1024 * 8,
-											MaxReadFrameSize:  1024 * 16,
-											DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
-												dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(localMaxlatency))
-												if err != nil {
-													return nil, err
-												}
-
-												config := utls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}
-												uTlsConn := utls.UClient(dialConn, &config, fingerprint)
-												handshake_e := uTlsConn.HandshakeContext(ctx)
-												if handshake_e != nil {
-													return nil, handshake_e
-												}
-												return uTlsConn, nil
-											},
-										}
-
-										client = &http.Client{
-											Transport: &h2,
-										}
-									} else {
-										client = &http.Client{Transport: &tr}
-									}
-								}
-							} else {
-								client = http.DefaultClient
 							}
 
 							client.Timeout = time.Millisecond * time.Duration(localMaxlatency)
@@ -669,14 +540,10 @@ func main() {
 							if conf.Scheme == "https" {
 								if conf.HTTP3 {
 									tconf := tls.Config{ServerName: sni, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
-									qconf := quic.Config{
-										InitialConnectionReceiveWindow: 1024 * 8,
-										InitialStreamReceiveWindow:     1024 * 8,
-									}
 									var h3tr http3.Transport
 									if conf.Noise.Enable {
 										h3tr = http3.Transport{
-											TLSClientConfig: &tconf, QUICConfig: &qconf,
+											TLSClientConfig: &tconf,
 											Dial: func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
 												udp, udpErr := net.ListenPacket("udp", "0.0.0.0:0")
 												if udpErr != nil {
@@ -705,7 +572,7 @@ func main() {
 											},
 										}
 									} else {
-										h3tr = http3.Transport{TLSClientConfig: &tconf, QUICConfig: &qconf}
+										h3tr = http3.Transport{TLSClientConfig: &tconf}
 									}
 									client = &http.Client{
 										Transport: &h3tr,
@@ -713,8 +580,6 @@ func main() {
 								} else {
 									if conf.Utls.Enable {
 										h2 := http2.Transport{
-											MaxHeaderListSize: 1024 * 8,
-											MaxReadFrameSize:  1024 * 16,
 											DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
 												dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(localMaxlatency))
 												if err != nil {
@@ -910,5 +775,69 @@ func resultFile(csv bool) *os.File {
 			log.Fatalln(err)
 		}
 		return file
+	}
+}
+
+func h3transporter(conf *Conf) *http.Client {
+	tconf := tls.Config{ServerName: conf.SNI, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
+	var h3tr http3.Transport
+	if conf.Noise.Enable {
+		h3tr = http3.Transport{
+			TLSClientConfig: &tconf,
+			Dial: func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
+				udp, udpErr := net.ListenPacket("udp", "0.0.0.0:0")
+				if udpErr != nil {
+					return nil, udpErr
+				}
+				uaddr, uaddrErr := net.ResolveUDPAddr("udp", addr)
+				if uaddrErr != nil {
+					return nil, uaddrErr
+				}
+				// noise
+				var packet []byte
+				if conf.Noise.Base64 {
+					decoded, bs4Err := base64.StdEncoding.DecodeString(conf.Noise.Packet)
+					if bs4Err != nil {
+						log.Fatalln(bs4Err)
+					}
+					packet = decoded
+				} else {
+					packet = []byte(conf.Noise.Packet)
+				}
+				udp.WriteTo(packet, uaddr)
+				time.Sleep(time.Millisecond * time.Duration(conf.Noise.Sleep))
+				return quic.Dial(
+					ctx, udp, uaddr, tlsCfg, cfg,
+				)
+			},
+		}
+	} else {
+		h3tr = http3.Transport{TLSClientConfig: &tconf}
+	}
+	return &http.Client{
+		Transport: &h3tr,
+	}
+}
+
+func h2transporter(conf *Conf, fingerprint utls.ClientHelloID, localMaxlatency int64) *http.Client {
+	h2 := http2.Transport{
+		DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
+			dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(localMaxlatency))
+			if err != nil {
+				return nil, err
+			}
+
+			config := utls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}
+			uTlsConn := utls.UClient(dialConn, &config, fingerprint)
+			handshake_e := uTlsConn.HandshakeContext(ctx)
+			if handshake_e != nil {
+				return nil, handshake_e
+			}
+			return uTlsConn, nil
+		},
+	}
+
+	return &http.Client{
+		Transport: &h2,
 	}
 }
