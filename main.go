@@ -58,6 +58,7 @@ type NoiseConfig struct {
 type DownloadConfig struct {
 	Enable      bool   `json:"Enable"`
 	Url         string `json:"Url"`
+	SNI         string `json:"SNI"`
 	TargetBytes int    `json:"TargetBytes"`
 	Timeout     int    `json:"Timeout"`
 }
@@ -138,12 +139,12 @@ func main() {
 					var client *http.Client
 					if conf.Scheme == "https" {
 						if conf.HTTP3 {
-							client = h3transporter(&conf)
+							client = h3transporter(&conf, nil)
 						} else {
 							if conf.Utls.Enable {
 								client = h2transporter(&conf, fingerprint, localMaxlatency)
 							} else {
-								client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: conf.Insecure}}}
+								client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}}}
 							}
 						}
 					} else {
@@ -306,12 +307,12 @@ func main() {
 					var client *http.Client
 					if conf.Scheme == "https" {
 						if conf.HTTP3 {
-							client = h3transporter(&conf)
+							client = h3transporter(&conf, nil)
 						} else {
 							if conf.Utls.Enable {
 								client = h2transporter(&conf, fingerprint, localMaxlatency)
 							} else {
-								client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: conf.Insecure}}}
+								client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}}}
 							}
 						}
 					} else {
@@ -599,7 +600,7 @@ func main() {
 											Transport: &h2,
 										}
 									} else {
-										tr := http.Transport{TLSClientConfig: &tls.Config{ServerName: sni, NextProtos: conf.Alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: conf.Insecure}}
+										tr := http.Transport{TLSClientConfig: &tls.Config{ServerName: sni, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}}
 										client = &http.Client{Transport: &tr}
 									}
 								}
@@ -778,8 +779,12 @@ func resultFile(csv bool) *os.File {
 	}
 }
 
-func h3transporter(conf *Conf) *http.Client {
-	tconf := tls.Config{ServerName: conf.SNI, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
+func h3transporter(conf *Conf, sni *string) *http.Client {
+	if sni == nil {
+		sni = &conf.SNI
+	}
+
+	tconf := tls.Config{ServerName: *sni, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
 	var h3tr http3.Transport
 	if conf.Noise.Enable {
 		h3tr = http3.Transport{

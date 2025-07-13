@@ -55,6 +55,7 @@
 	"DownloadTest": {
 		"Enable": false,
 		"Url": "https://speed.cloudflare.com/__down?bytes=10000000",
+		"SNI": "cp.cloudflare.com",
 		"TargetBytes": 5000000,
 		"Timeout": 5000
 	}

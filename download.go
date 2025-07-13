@@ -12,21 +12,21 @@ import (
 )
 
 func downloadTest(conf *Conf, ip string) string {
+	configUrl, configUrlErr := url.Parse(conf.DownloadTest.Url)
+	if configUrlErr != nil {
+		log.Fatalln(configUrlErr)
+	}
+
 	var client *http.Client
 	if conf.Scheme == "https" {
 		if conf.HTTP3 {
-			client = h3transporter(conf)
+			client = h3transporter(conf, &conf.DownloadTest.SNI)
 		} else {
-			tr := http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, MinVersion: tls.VersionTLS13, InsecureSkipVerify: conf.Insecure}}
+			tr := http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.DownloadTest.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}}
 			client = &http.Client{Transport: &tr}
 		}
 	} else {
 		client = http.DefaultClient
-	}
-
-	configUrl, configUrlErr := url.Parse(conf.DownloadTest.Url)
-	if configUrlErr != nil {
-		log.Fatalln(configUrlErr)
 	}
 
 	req := http.Request{Method: "GET", URL: &url.URL{Scheme: configUrl.Scheme, Host: ip, Path: configUrl.Path, RawQuery: configUrl.RawQuery}, Host: configUrl.Host}
@@ -36,14 +36,15 @@ func downloadTest(conf *Conf, ip string) string {
 		return "FAILED"
 	}
 	if respone.StatusCode != 200 {
+		color.Red("Download host status code: %s", respone.Status)
 		return "FAILED"
 	}
 
+	reader := respone.Body
+	defer reader.Close()
 	ch := make(chan string)
 	go func() {
 		buf := make([]byte, 1024*8)
-		reader := respone.Body
-		defer reader.Close()
 		read := 0
 		start := time.Now()
 		for {
