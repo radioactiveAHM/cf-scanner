@@ -30,14 +30,10 @@ go build -ldflags "-w -s"
 
 ## Configuration Parameters
 
-> [!NOTE]
-> If both `N3` and `N4` are set to null, the IPs listed in `IplistPath` will be scanned line by line, as-is.
-
-> [!WARNING]
-> If DownloadTest is enabled, use only one Goroutine; running multiple will yield inaccurate results.
-
-> [!WARNING]
-> If Utls is enabled, HTTP/2 will be used.
+- NOTE❕: If both `N3` and `N4` are set to null, the IPs listed in `IplistPath` will be scanned line by line, as-is.
+- NOTE❕: Both HTTP/2 and HTTP/1.1 are supported, with protocol selection based on ALPN. If ALPN is explicitly set to `"h2"`, HTTP/2 will be used—provided the server supports it. By default, ALPN is set to `"h2", "http/1.1"`, allowing HTTP/2 when available; otherwise, the connection falls back to HTTP/1.1.
+- WARNING⚠️: When UTLS is enabled, ALPN is forcibly set to `"h2", "http/1.1"` and cannot be overridden via the configuration file.
+- WARNING⚠️: If DownloadTest is enabled, use only one Goroutine; running multiple will yield inaccurate results.
 
 > [!CAUTION]
 > Avoid using your own domain for scanning activities, as CDN providers may interpret the traffic as DDoS or port scanning behavior and block your domain.
@@ -55,26 +51,27 @@ go build -ldflags "-w -s"
     "Server": "cloudflare"
  },
  "ResponseStatusCode": [200, 204], // Acceptable status codes.
- "SNI": "cp.cloudflare.com", // The SNI value to use during the TLS handshake.
- "Insecure": false, // Certificate validation.
- "Utls": { // Enable UTLS fingerprint. Supported fingerprints are firefox, edge, chrome, 360 and ios.
-    "Enable": true,
-    "Fingerprint": "firefox"
- },
- "Scheme": "https", // The protocol scheme (http or https).
  "Ping": true, // Enable ping IP.
  "MaxPing": 200, // Maximum acceptable ping time (in milliseconds).
  "Goroutines": 8, // Number of concurrent goroutines for scanning.
  "Scans": 6000, // Total number of scans to perform per goroutine.
  "Maxlatency": 1000, // Maximum acceptable latency (in milliseconds).
- "DynamicLatency": false, // Dynamically updates MaxLatency to an average latency during runtime.
  "Jitter": true, // Enable jitter calculation.
  "MaxJitter": 20, // Acceptable jitter.
  "JitterInterval": 200, // Sleep time interval between jitter calculations (in milliseconds).
- "Alpn": ["http/1.1"], // List of supported ALPN (Application-Layer Protocol Negotiation) protocols.
  "IpVersion": "v4", // IP version (`v4` or `v6`).
  "IplistPath": "ipv4.txt", // Path to the file containing a list of IP addresses (e.g., `ipv4.txt`).
  "IgnoreRange": [], // List of octets where each IP matching the first octet will be ignored. (e.g., `["172", "104"]`).
+ "TLS": {
+   "Enable": true,
+   "SNI": "cp.cloudflare.com", // The SNI value to use during the TLS handshake.
+   "Insecure": false, // Certificate validation.
+   "Alpn": ["h2", "http/1.1"], // List of supported ALPN (Application-Layer Protocol Negotiation) protocols.
+   "Utls": {
+    "Enable": true, // Enable UTLS fingerprint.
+    "Fingerprint": "firefox" // Supported fingerprints are firefox, edge, chrome, 360 and ios.
+   }
+ },
  "HTTP/3": false, // Use HTTP version 3 or not.
  "Noise": {
     "Enable": false, // Enable UDP noise injection for HTTP/3.
@@ -101,6 +98,7 @@ go build -ldflags "-w -s"
  "DownloadTest": {
     "Enable": false, // Enable the download speed test.
     "Url": "https://speed.cloudflare.com/__down?bytes=10000000", // Target URL for download.
+    "SNI": "cp.cloudflare.com", // The SNI value to use during the TLS handshake for DownloadTest.
     "TargetBytes": 5000000, // Expected data in bytes; if not met, report as JAMMED.
     "Timeout": 5000 // Timeout duration in milliseconds before aborting the download.
  }

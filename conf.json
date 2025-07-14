@@ -9,26 +9,27 @@
 		"Server": "cloudflare"
 	},
 	"ResponseStatusCode": [200, 204],
-	"SNI": "cp.cloudflare.com",
-	"Insecure": false,
-	"Utls": {
-		"Enable": true,
-		"Fingerprint": "firefox"
-	},
-	"Scheme": "https",
 	"Ping": true,
-	"MaxPing": 200,
+	"MaxPing": 300,
 	"Goroutines": 8,
 	"Scans": 6000,
 	"Maxlatency": 1000,
-	"DynamicLatency": false,
 	"Jitter": true,
 	"MaxJitter": 20,
 	"JitterInterval": 200,
-	"Alpn": ["http/1.1"],
 	"IpVersion": "v4",
 	"IplistPath": "ipv4.txt",
 	"IgnoreRange": [],
+	"TLS": {
+		"Enable": true,
+		"SNI": "cp.cloudflare.com",
+		"Insecure": false,
+		"Alpn": ["h2", "http/1.1"],
+		"Utls": {
+			"Enable": true,
+			"Fingerprint": "firefox"
+		}
+	},
 	"HTTP/3": false,
 	"Noise": {
 		"Enable": false,

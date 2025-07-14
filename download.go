@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,24 +8,37 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	utls "github.com/refraction-networking/utls"
 )
 
-func downloadTest(conf *Conf, ip string) string {
+func downloadTest(preclient *http.Client, conf *Conf, ip string, fingerprint utls.ClientHelloID) string {
 	configUrl, configUrlErr := url.Parse(conf.DownloadTest.Url)
 	if configUrlErr != nil {
 		log.Fatalln(configUrlErr)
 	}
 
 	var client *http.Client
-	if conf.Scheme == "https" {
-		if conf.HTTP3 {
-			client = h3transporter(conf, &conf.DownloadTest.SNI)
-		} else {
-			tr := http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.DownloadTest.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}}
-			client = &http.Client{Transport: &tr}
-		}
+	if conf.TLS.SNI == conf.DownloadTest.SNI {
+		// Use same connection if SNI is same
+		client = preclient
 	} else {
-		client = http.DefaultClient
+		if configUrl.Scheme == "https" {
+			if conf.HTTP3 {
+				client = h3transporter(conf, &conf.DownloadTest.SNI)
+			} else {
+				if conf.TLS.Utls.Enable {
+					uclient, utlsE := utlsTransporter(conf, fingerprint, &conf.DownloadTest.SNI, ip)
+					if utlsE != nil {
+						return "FAILED"
+					}
+					client = uclient
+				} else {
+					client = tlsTransporter(conf, &conf.DownloadTest.SNI)
+				}
+			}
+		} else {
+			client = http.DefaultClient
+		}
 	}
 
 	req := http.Request{Method: "GET", URL: &url.URL{Scheme: configUrl.Scheme, Host: ip, Path: configUrl.Path, RawQuery: configUrl.RawQuery}, Host: configUrl.Host}

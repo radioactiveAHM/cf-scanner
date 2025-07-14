@@ -28,11 +28,6 @@ import (
 	utls "github.com/refraction-networking/utls"
 )
 
-type UtlsConfig struct {
-	Enable      bool   `json:"Enable"`
-	Fingerprint string `json:"Fingerprint"`
-}
-
 type Linear struct {
 	Enable bool `json:"Enable"`
 	N3     int  `json:"N3"`
@@ -63,6 +58,19 @@ type DownloadConfig struct {
 	Timeout     int    `json:"Timeout"`
 }
 
+type UtlsConfig struct {
+	Enable      bool   `json:"Enable"`
+	Fingerprint string `json:"Fingerprint"`
+}
+
+type TLSConfig struct {
+	Enable   bool       `json:"Enable"`
+	SNI      string     `json:"SNI"`
+	Insecure bool       `json:"Insecure"`
+	Alpn     []string   `json:"Alpn"`
+	Utls     UtlsConfig `json:"Utls"`
+}
+
 type Conf struct {
 	Hostname           string              `json:"Hostname"`
 	Ports              []int               `json:"Ports"`
@@ -70,23 +78,18 @@ type Conf struct {
 	Headers            map[string][]string `json:"Headers"`
 	ResponseHeader     map[string]string   `json:"ResponseHeader"`
 	ResponseStatusCode []int               `json:"ResponseStatusCode"`
-	SNI                string              `json:"SNI"`
-	Insecure           bool                `json:"Insecure"`
-	Utls               UtlsConfig          `json:"Utls"`
 	Ping               bool                `json:"Ping"`
 	MaxPing            int                 `json:"MaxPing"`
 	Goroutines         int                 `json:"Goroutines"`
 	Scans              int                 `json:"Scans"`
 	Maxlatency         int64               `json:"Maxlatency"`
-	DynamicLatency     bool                `json:"DynamicLatency"`
 	Jitter             bool                `json:"Jitter"`
 	MaxJitter          float64             `json:"MaxJitter"`
 	JitterInterval     int64               `json:"JitterInterval"`
-	Scheme             string              `json:"Scheme"`
-	Alpn               []string            `json:"Alpn"`
 	IpVersion          string              `json:"IpVersion"`
 	IplistPath         string              `json:"IplistPath"`
 	IgnoreRange        []string            `json:"IgnoreRange"`
+	TLS                TLSConfig           `json:"TLS"`
 	HTTP3              bool                `json:"HTTP/3"`
 	Noise              NoiseConfig         `json:"Noise"`
 	LinearScan         Linear              `json:"LinearScan"`
@@ -110,12 +113,14 @@ func main() {
 	}
 
 	fingerprint := utls.HelloChrome_Auto
-	if conf.Utls.Enable {
-		fingerprint = fgen(conf.Utls.Fingerprint)
+	if conf.TLS.Utls.Enable {
+		fingerprint = fgen(conf.TLS.Utls.Fingerprint)
 	}
 
+	scheme := "http"
 	if len(conf.Ports) == 0 {
-		if conf.Scheme == "https" {
+		if conf.TLS.Enable {
+			scheme = "https"
 			conf.Ports = append(conf.Ports, 443)
 		} else {
 			conf.Ports = append(conf.Ports, 80)
@@ -135,17 +140,12 @@ func main() {
 						log.Fatalln(ipListFileErr)
 					}
 					ranges := strings.Split(string(file), "\n")
-					localMaxlatency := conf.Maxlatency
 					var client *http.Client
-					if conf.Scheme == "https" {
+					if conf.TLS.Enable {
 						if conf.HTTP3 {
 							client = h3transporter(&conf, nil)
 						} else {
-							if conf.Utls.Enable {
-								client = h2transporter(&conf, fingerprint, localMaxlatency)
-							} else {
-								client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}}}
-							}
+							client = tlsTransporter(&conf, nil)
 						}
 					} else {
 						client = http.DefaultClient
@@ -170,7 +170,7 @@ func main() {
 							selected := strings.TrimSpace(randomRange)
 							ip = "[" + selected + ops[rand.Intn(len(ops))] + ops[rand.Intn(len(ops))] + ops[rand.Intn(len(ops))] + ops[rand.Intn(len(ops))] + "]"
 						} else {
-							log.Fatalf("Invalid IP version")
+							log.Fatalln("Invalid IP version")
 						}
 
 						minrtt := time.Millisecond
@@ -180,13 +180,13 @@ func main() {
 							pinger.SetPrivileged(true)
 							pinger.Timeout = time.Duration(conf.MaxPing) * time.Millisecond
 							if ping_err != nil {
-								log.Println("PING: " + ping_err.Error())
+								color.Red("PING: %s", ping_err)
 								continue
 							}
 							pinger.Count = 1
 							pinging_err := pinger.Run()
 							if pinging_err != nil {
-								log.Println("PING: " + pinging_err.Error())
+								color.Red("PING: %s", pinging_err)
 								continue
 							}
 
@@ -201,15 +201,23 @@ func main() {
 						for _, port := range conf.Ports {
 							ip := fmt.Sprintf("%s:%d", ip, port)
 							// generate http req
-							req := http.Request{Method: "GET", URL: &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
+							req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
 							req.Header = maps.Clone(conf.Headers)
 							req.Header.Set("Host", conf.Hostname)
 							if conf.Padding {
 								req.Header.Set("Cookie", genPadding(conf.PaddingSize))
 							}
 
-							client.Timeout = time.Millisecond * time.Duration(localMaxlatency)
+							client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
 							s := time.Now()
+							if conf.TLS.Utls.Enable && conf.TLS.Enable {
+								uclient, utlsE := utlsTransporter(&conf, fingerprint, nil, ip)
+								if utlsE != nil {
+									color.Red("%s", utlsE.Error())
+									continue
+								}
+								client = uclient
+							}
 							// send request
 							respone, http_err := client.Do(&req)
 							e := time.Now()
@@ -220,9 +228,6 @@ func main() {
 							}
 
 							if slices.Contains(conf.ResponseStatusCode, respone.StatusCode) && match(respone.Header, conf.ResponseHeader) {
-								if conf.DynamicLatency {
-									localMaxlatency = (localMaxlatency + latency) / 2
-								}
 								// Calc jiiter
 								jitter_str := "Null"
 								download_test := "Null"
@@ -256,7 +261,7 @@ func main() {
 									jitter_str = fmt.Sprintf("%f", jitter)
 								}
 								if conf.DownloadTest.Enable {
-									download_test = downloadTest(&conf, ip)
+									download_test = downloadTest(client, &conf, ip, fingerprint)
 								}
 								rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, download_test)
 								color.Green("%s", rep)
@@ -303,17 +308,12 @@ func main() {
 			// scanners
 			for range conf.Goroutines {
 				go func() {
-					localMaxlatency := conf.Maxlatency
 					var client *http.Client
-					if conf.Scheme == "https" {
+					if conf.TLS.Enable {
 						if conf.HTTP3 {
 							client = h3transporter(&conf, nil)
 						} else {
-							if conf.Utls.Enable {
-								client = h2transporter(&conf, fingerprint, localMaxlatency)
-							} else {
-								client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}}}
-							}
+							client = tlsTransporter(&conf, nil)
 						}
 					} else {
 						client = http.DefaultClient
@@ -329,13 +329,13 @@ func main() {
 							pinger.SetPrivileged(true)
 							pinger.Timeout = time.Duration(conf.MaxPing) * time.Millisecond
 							if ping_err != nil {
-								log.Println("PING: " + ping_err.Error())
+								color.Red("PING: %s", ping_err)
 								continue
 							}
 							pinger.Count = 1
 							pinging_err := pinger.Run()
 							if pinging_err != nil {
-								log.Println("PING: " + pinging_err.Error())
+								color.Red("PING: %s", pinging_err)
 								continue
 							}
 
@@ -350,15 +350,23 @@ func main() {
 						for _, port := range conf.Ports {
 							ip := fmt.Sprintf("%s:%d", ip, port)
 							// generate http req
-							req := http.Request{Method: "GET", URL: &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
+							req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
 							req.Header = maps.Clone(conf.Headers)
 							req.Header.Set("Host", conf.Hostname)
 							if conf.Padding {
 								req.Header.Set("Cookie", genPadding(conf.PaddingSize))
 							}
 
-							client.Timeout = time.Millisecond * time.Duration(localMaxlatency)
+							client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
 							s := time.Now()
+							if conf.TLS.Utls.Enable && conf.TLS.Enable {
+								uclient, utlsE := utlsTransporter(&conf, fingerprint, nil, ip)
+								if utlsE != nil {
+									color.Red("%s", utlsE.Error())
+									continue
+								}
+								client = uclient
+							}
 							// send request
 							respone, http_err := client.Do(&req)
 							e := time.Now()
@@ -369,9 +377,6 @@ func main() {
 							}
 
 							if slices.Contains(conf.ResponseStatusCode, respone.StatusCode) && match(respone.Header, conf.ResponseHeader) {
-								if conf.DynamicLatency {
-									localMaxlatency = (localMaxlatency + latency) / 2
-								}
 								// Calc jiiter
 								jitter_str := "Null"
 								download_test := "Null"
@@ -405,7 +410,7 @@ func main() {
 									jitter_str = fmt.Sprintf("%f", jitter)
 								}
 								if conf.DownloadTest.Enable {
-									download_test = downloadTest(&conf, ip)
+									download_test = downloadTest(client, &conf, ip, fingerprint)
 								}
 								rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, download_test)
 								color.Green("%s", rep)
@@ -479,7 +484,6 @@ func main() {
 		ch := make(chan string)
 		for domainsChunk := range slices.Chunk(domains, len(domains)/conf.Goroutines) {
 			go func() {
-				localMaxlatency := conf.Maxlatency
 				for _, domain := range domainsChunk {
 					domain := strings.TrimSpace(domain)
 					ips, resolve_err := net.LookupIP(domain)
@@ -502,13 +506,13 @@ func main() {
 							pinger.SetPrivileged(true)
 							pinger.Timeout = time.Duration(conf.MaxPing) * time.Millisecond
 							if ping_err != nil {
-								log.Println("PING: " + ping_err.Error())
+								color.Red("PING: %s", ping_err)
 								continue
 							}
 							pinger.Count = 1
 							pinging_err := pinger.Run()
 							if pinging_err != nil {
-								log.Println("PING: " + pinging_err.Error())
+								color.Red("PING: %s", pinging_err)
 								continue
 							}
 
@@ -526,90 +530,38 @@ func main() {
 							if conf.DomainScan.DomainAsHost {
 								host = domain
 							}
-							req := http.Request{Method: "GET", URL: &url.URL{Scheme: conf.Scheme, Host: ip, Path: conf.Path}, Host: host}
+							req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: ip, Path: conf.Path}, Host: host}
 							req.Header = maps.Clone(conf.Headers)
 							req.Header.Set("Host", host)
 							if conf.Padding {
 								req.Header.Set("Cookie", genPadding(conf.PaddingSize))
 							}
 
-							sni := conf.SNI
+							sni := conf.TLS.SNI
 							if conf.DomainScan.DomainAsSNI {
 								sni = domain
 							}
 							var client *http.Client
-							if conf.Scheme == "https" {
+							if conf.TLS.Enable {
 								if conf.HTTP3 {
-									tconf := tls.Config{ServerName: sni, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
-									var h3tr http3.Transport
-									if conf.Noise.Enable {
-										h3tr = http3.Transport{
-											TLSClientConfig: &tconf,
-											Dial: func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
-												udp, udpErr := net.ListenPacket("udp", "0.0.0.0:0")
-												if udpErr != nil {
-													return nil, udpErr
-												}
-												uaddr, uaddrErr := net.ResolveUDPAddr("udp", addr)
-												if uaddrErr != nil {
-													return nil, uaddrErr
-												}
-												// noise
-												var packet []byte
-												if conf.Noise.Base64 {
-													decoded, bs4Err := base64.StdEncoding.DecodeString(conf.Noise.Packet)
-													if bs4Err != nil {
-														log.Fatalln(bs4Err)
-													}
-													packet = decoded
-												} else {
-													packet = []byte(conf.Noise.Packet)
-												}
-												udp.WriteTo(packet, uaddr)
-												time.Sleep(time.Millisecond * time.Duration(conf.Noise.Sleep))
-												return quic.Dial(
-													ctx, udp, uaddr, tlsCfg, cfg,
-												)
-											},
-										}
-									} else {
-										h3tr = http3.Transport{TLSClientConfig: &tconf}
-									}
-									client = &http.Client{
-										Transport: &h3tr,
-									}
+									client = h3transporter(&conf, &sni)
 								} else {
-									if conf.Utls.Enable {
-										h2 := http2.Transport{
-											DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
-												dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(localMaxlatency))
-												if err != nil {
-													return nil, err
-												}
-												config := utls.Config{ServerName: sni, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}
-												uTlsConn := utls.UClient(dialConn, &config, fingerprint)
-												handshake_e := uTlsConn.HandshakeContext(ctx)
-												if handshake_e != nil {
-													return nil, handshake_e
-												}
-												return uTlsConn, nil
-											},
-										}
-
-										client = &http.Client{
-											Transport: &h2,
-										}
-									} else {
-										tr := http.Transport{TLSClientConfig: &tls.Config{ServerName: sni, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}}
-										client = &http.Client{Transport: &tr}
-									}
+									client = tlsTransporter(&conf, &sni)
 								}
 							} else {
 								client = http.DefaultClient
 							}
 
-							client.Timeout = time.Millisecond * time.Duration(localMaxlatency)
+							client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
 							s := time.Now()
+							if conf.TLS.Utls.Enable && conf.TLS.Enable {
+								uclient, utlsE := utlsTransporter(&conf, fingerprint, &sni, ip)
+								if utlsE != nil {
+									color.Red("%s", utlsE.Error())
+									continue
+								}
+								client = uclient
+							}
 							// send request
 							respone, http_err := client.Do(&req)
 							e := time.Now()
@@ -620,9 +572,6 @@ func main() {
 							}
 
 							if slices.Contains(conf.ResponseStatusCode, respone.StatusCode) && match(respone.Header, conf.ResponseHeader) {
-								if conf.DynamicLatency {
-									localMaxlatency = (localMaxlatency + latency) / 2
-								}
 								// Calc jiiter
 								jitter_str := "Null"
 								download_test := "Null"
@@ -656,7 +605,7 @@ func main() {
 									jitter_str = fmt.Sprintf("%f", jitter)
 								}
 								if conf.DownloadTest.Enable {
-									download_test = downloadTest(&conf, ip)
+									download_test = downloadTest(client, &conf, ip, fingerprint)
 								}
 								rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, download_test)
 								color.Green("%s", rep)
@@ -781,10 +730,10 @@ func resultFile(csv bool) *os.File {
 
 func h3transporter(conf *Conf, sni *string) *http.Client {
 	if sni == nil {
-		sni = &conf.SNI
+		sni = &conf.TLS.SNI
 	}
 
-	tconf := tls.Config{ServerName: *sni, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.Insecure}
+	tconf := tls.Config{ServerName: *sni, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.TLS.Insecure}
 	var h3tr http3.Transport
 	if conf.Noise.Enable {
 		h3tr = http3.Transport{
@@ -824,25 +773,56 @@ func h3transporter(conf *Conf, sni *string) *http.Client {
 	}
 }
 
-func h2transporter(conf *Conf, fingerprint utls.ClientHelloID, localMaxlatency int64) *http.Client {
-	h2 := http2.Transport{
-		DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
-			dialConn, err := net.DialTimeout(network, addr, time.Millisecond*time.Duration(localMaxlatency))
-			if err != nil {
-				return nil, err
-			}
-
-			config := utls.Config{ServerName: conf.SNI, NextProtos: conf.Alpn, InsecureSkipVerify: conf.Insecure}
-			uTlsConn := utls.UClient(dialConn, &config, fingerprint)
-			handshake_e := uTlsConn.HandshakeContext(ctx)
-			if handshake_e != nil {
-				return nil, handshake_e
-			}
-			return uTlsConn, nil
-		},
+func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni *string, addr string) (*http.Client, error) {
+	if sni == nil {
+		sni = &conf.TLS.SNI
+	}
+	dialConn, err := net.DialTimeout("tcp", addr, time.Millisecond*time.Duration(conf.Maxlatency))
+	if err != nil {
+		return nil, err
+	}
+	uTlsConn := utls.UClient(dialConn, &utls.Config{ServerName: *sni, InsecureSkipVerify: conf.TLS.Insecure}, fingerprint)
+	cx, cxCancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(conf.Maxlatency))
+	defer cxCancel()
+	handshake_e := uTlsConn.HandshakeContext(cx)
+	if handshake_e != nil {
+		return nil, fmt.Errorf("%s: UTLS handshake timeout", addr)
 	}
 
+	if uTlsConn.ConnectionState().NegotiatedProtocol == "h2" {
+		h2 := http2.Transport{
+			DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
+				return uTlsConn, nil
+			},
+		}
+		return &http.Client{
+			Transport: &h2,
+		}, nil
+	} else {
+		h1 := http.Transport{
+			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return uTlsConn, nil
+			},
+		}
+		return &http.Client{
+			Transport: &h1,
+		}, nil
+	}
+}
+
+func tlsTransporter(conf *Conf, sni *string) *http.Client {
+	if sni == nil {
+		sni = &conf.TLS.SNI
+	}
+
+	tr := http.Transport{
+		TLSClientConfig: &tls.Config{ServerName: *sni, InsecureSkipVerify: conf.TLS.Insecure, NextProtos: conf.TLS.Alpn},
+		Protocols:       &http.Protocols{},
+	}
+	tr.Protocols.SetHTTP1(true)
+	tr.Protocols.SetHTTP2(true)
+
 	return &http.Client{
-		Transport: &h2,
+		Transport: &tr,
 	}
 }
