@@ -210,7 +210,7 @@ func main() {
 
 							client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
 							s := time.Now()
-							if conf.TLS.Utls.Enable && conf.TLS.Enable {
+							if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
 								uclient, utlsE := utlsTransporter(&conf, fingerprint, nil, ip)
 								if utlsE != nil {
 									color.Red("%s", utlsE.Error())
@@ -359,7 +359,7 @@ func main() {
 
 							client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
 							s := time.Now()
-							if conf.TLS.Utls.Enable && conf.TLS.Enable {
+							if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
 								uclient, utlsE := utlsTransporter(&conf, fingerprint, nil, ip)
 								if utlsE != nil {
 									color.Red("%s", utlsE.Error())
@@ -554,7 +554,7 @@ func main() {
 
 							client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
 							s := time.Now()
-							if conf.TLS.Utls.Enable && conf.TLS.Enable {
+							if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
 								uclient, utlsE := utlsTransporter(&conf, fingerprint, &sni, ip)
 								if utlsE != nil {
 									color.Red("%s", utlsE.Error())
