@@ -33,7 +33,7 @@
 	"HTTP/3": false,
 	"Noise": {
 		"Enable": false,
-		"Packet": "str://Meow",
+		"Packet": "str://meow",
 		"Sleep": 500
 	},
 	"LinearScan": {

@@ -75,9 +75,8 @@ go build -ldflags "-w -s"
  "HTTP/3": false, // Use HTTP version 3 or not.
  "Noise": {
     "Enable": false, // Enable UDP noise injection for HTTP/3.
-    "Packet": "Meow", // Noise payload to send.
+    "Packet": "str://meow", // Noise payload to send.
     "Sleep": 500, // Delay in milliseconds after sending noise.
-    "Base64": false // Interpret 'Packet' as raw string (false) or base64-encoded bytes (true).
  },
  "LinearScan": {
     "Enable": false, // Enable linear scanning.            104.17.178.0
@@ -101,6 +100,16 @@ go build -ldflags "-w -s"
     "SNI": "cp.cloudflare.com", // The SNI value to use during the TLS handshake for DownloadTest.
     "TargetBytes": 5000000, // Expected data in bytes; if not met, report as JAMMED.
     "Timeout": 5000 // Timeout duration in milliseconds before aborting the download.
+ },
+ "UdpScan": {
+   "Enable": false, // Enable or disable the UDP scan
+   "Packets": [ // Defines a sequence of packets to send. Supports base64, plain string ("str"), and hexadecimal ("hex") formats.
+      {
+         // The packet payload data. This example targets Cloudflare Warp using a WireGuard-formatted packet.
+         "payload": "base64://ATVweRyrGwyVXtU8NFbPgilDINuh2HUt4WbUdCQ/N8hbnFXND4SoNbP/JVfsOg+WcASDO5MKq9w8HWp0Azbb60kgSSaK+dc1CA0Jm1qbRRl+ukR/g68Ae7iYjR3tAXzBSU8HYLeMQ3rmx6yS7FF+bIfyXHZ5vSnbUlIDRM53Q5+YRcDoAAAAAAAAAAAAAAAAAAAAAA==",
+         "sleep": 0 // Optional delay (in milliseconds) after sending this packet.
+      }
+   ]
  }
 }
 ```
