@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -47,7 +46,6 @@ type NoiseConfig struct {
 	Enable bool   `json:"Enable"`
 	Packet string `json:"Packet"`
 	Sleep  int    `json:"Sleep"`
-	Base64 bool   `json:"Base64"`
 }
 
 type DownloadConfig struct {
@@ -69,6 +67,16 @@ type TLSConfig struct {
 	Insecure bool       `json:"Insecure"`
 	Alpn     []string   `json:"Alpn"`
 	Utls     UtlsConfig `json:"Utls"`
+}
+
+type UdpPayload struct {
+	Payload string `json:"Payload"`
+	Sleep   int    `json:"Sleep"`
+}
+
+type UdpScanConfig struct {
+	Enable  bool         `json:"Enable"`
+	Packets []UdpPayload `json:"Packets"`
 }
 
 type Conf struct {
@@ -98,6 +106,7 @@ type Conf struct {
 	PaddingSize        string              `json:"PaddingSize"`
 	CSV                bool                `json:"CSV"`
 	DownloadTest       DownloadConfig      `json:"DownloadTest"`
+	UdpScan            UdpScanConfig       `json:"UdpScan"`
 }
 
 func main() {
@@ -110,6 +119,12 @@ func main() {
 	conf_err := json.Unmarshal(cfile, &conf)
 	if conf_err != nil {
 		log.Fatalln(conf_err.Error())
+	}
+
+	if conf.UdpScan.Enable {
+		color.Blue("UdpScan Scanner ->\n")
+		UdpScan(&conf)
+		return
 	}
 
 	fingerprint := utls.HelloChrome_Auto
@@ -127,11 +142,10 @@ func main() {
 		}
 	}
 
-	color.Blue("Starting Scanner ->\n")
-
+	color.Green("Starting Scanner ->\n")
 	if !conf.DomainScan.Enable {
 		if !conf.LinearScan.Enable {
-			ch := make(chan string)
+			ch := make(chan string, conf.Goroutines)
 			for range conf.Goroutines {
 				go func() {
 					// Load IP list file
@@ -302,8 +316,8 @@ func main() {
 			if conf.IpVersion != "v4" {
 				log.Fatalln("Linear method is only available for ipv4")
 			}
-			res_Ch := make(chan string)
-			ip_ch := make(chan string)
+			res_Ch := make(chan string, conf.Goroutines)
+			ip_ch := make(chan string, conf.Goroutines)
 
 			// scanners
 			for range conf.Goroutines {
@@ -481,7 +495,7 @@ func main() {
 			})
 		}
 
-		ch := make(chan string)
+		ch := make(chan string, conf.Goroutines)
 		for domainsChunk := range slices.Chunk(domains, len(domains)/conf.Goroutines) {
 			go func() {
 				for _, domain := range domainsChunk {
@@ -748,16 +762,7 @@ func h3transporter(conf *Conf, sni *string) *http.Client {
 					return nil, uaddrErr
 				}
 				// noise
-				var packet []byte
-				if conf.Noise.Base64 {
-					decoded, bs4Err := base64.StdEncoding.DecodeString(conf.Noise.Packet)
-					if bs4Err != nil {
-						log.Fatalln(bs4Err)
-					}
-					packet = decoded
-				} else {
-					packet = []byte(conf.Noise.Packet)
-				}
+				var packet []byte = decoder(conf.Noise.Packet)
 				udp.WriteTo(packet, uaddr)
 				time.Sleep(time.Millisecond * time.Duration(conf.Noise.Sleep))
 				return quic.Dial(

@@ -33,9 +33,8 @@
 	"HTTP/3": false,
 	"Noise": {
 		"Enable": false,
-		"Packet": "Meow",
-		"Sleep": 500,
-		"Base64": false
+		"Packet": "str://Meow",
+		"Sleep": 500
 	},
 	"LinearScan": {
 		"Enable": false,
@@ -59,5 +58,14 @@
 		"SNI": "cp.cloudflare.com",
 		"TargetBytes": 5000000,
 		"Timeout": 5000
+	},
+	"UdpScan": {
+		"Enable": false,
+		"Packets": [
+			{
+				"payload": "base64://ATVweRyrGwyVXtU8NFbPgilDINuh2HUt4WbUdCQ/N8hbnFXND4SoNbP/JVfsOg+WcASDO5MKq9w8HWp0Azbb60kgSSaK+dc1CA0Jm1qbRRl+ukR/g68Ae7iYjR3tAXzBSU8HYLeMQ3rmx6yS7FF+bIfyXHZ5vSnbUlIDRM53Q5+YRcDoAAAAAAAAAAAAAAAAAAAAAA==",
+				"sleep": 0
+			}
+		]
 	}
 }
