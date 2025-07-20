@@ -122,7 +122,7 @@ func main() {
 	}
 
 	if conf.UdpScan.Enable {
-		color.Blue("UdpScan Scanner ->\n")
+		color.Blue("【ＵＤＰ Ｓｃａｎ】\n")
 		UdpScan(&conf)
 		return
 	}
@@ -141,8 +141,7 @@ func main() {
 			conf.Ports = append(conf.Ports, 80)
 		}
 	}
-
-	color.Green("Starting Scanner ->\n")
+	color.Green("【ＨＴＴＰ Ｓｃａｎ】\n")
 	if !conf.DomainScan.Enable {
 		if !conf.LinearScan.Enable {
 			ch := make(chan string, conf.Goroutines)
