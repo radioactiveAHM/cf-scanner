@@ -5,14 +5,13 @@ go 1.24.5
 require (
 	github.com/fatih/color v1.18.0
 	github.com/prometheus-community/pro-bing v0.7.0
-	github.com/quic-go/quic-go v0.53.0
-	github.com/refraction-networking/utls v1.7.3
+	github.com/quic-go/quic-go v0.54.0
+	github.com/refraction-networking/utls v1.8.0
 	golang.org/x/net v0.42.0
 )
 
 require (
 	github.com/andybalholm/brotli v1.2.0 // indirect
-	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
