@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,43 +15,26 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 )
 
-func UdpScan(conf *Conf) {
+func UdpScan(conf *Conf, ips []string) {
 
 	if len(conf.Ports) == 0 {
 		conf.Ports = []int{2408, 1701, 500, 4500}
 	}
 
-	if !conf.LinearScan.Enable {
+	if !conf.LinearScan {
 		ch := make(chan string, conf.Goroutines)
 		for range conf.Goroutines {
 			go func() {
-				// Load IP list file
-				file, ipListFileErr := os.ReadFile(conf.IplistPath)
-				if ipListFileErr != nil {
-					log.Fatalln(ipListFileErr)
-				}
-				ranges := strings.Split(string(file), "\n")
 				for range conf.Scans {
 					ip := ""
-					// pick an ip
-					if conf.IpVersion == "v4" {
-						n4 := strconv.Itoa(rand.Intn(255))
-						randomRange := ranges[rand.Intn(len(ranges))]
-						if randomRange == "" || randomRange == " " || ignore(randomRange, conf.IgnoreRange) {
+					if conf.IpVersion == "v6" {
+						ipv6, e := randomIPv6FromCIDR(strings.TrimSpace(ips[rand.Intn(len(ips))]))
+						if e != nil {
 							continue
 						}
-						ip_parts := strings.Split(strings.TrimSpace(randomRange), ".")
-						ip = fmt.Sprintf("%s.%s.%s.%s", ip_parts[0], ip_parts[1], ip_parts[2], n4)
-					} else if conf.IpVersion == "v6" {
-						ops := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f", ""}
-						randomRange := ranges[rand.Intn(len(ranges))]
-						if randomRange == "" || randomRange == " " {
-							continue
-						}
-						selected := strings.TrimSpace(randomRange)
-						ip = "[" + selected + ops[rand.Intn(len(ops))] + ops[rand.Intn(len(ops))] + ops[rand.Intn(len(ops))] + ops[rand.Intn(len(ops))] + "]"
+						ip = fmt.Sprintf("[%s]", ipv6.String())
 					} else {
-						log.Fatalln("Invalid IP version")
+						ip = ips[rand.Intn(len(ips))]
 					}
 
 					minrtt := time.Millisecond
@@ -130,7 +112,10 @@ func UdpScan(conf *Conf) {
 		for range conf.Goroutines {
 			go func() {
 				for {
-					ip := <-ip_ch
+					ip, e := <-ip_ch
+					if !e {
+						break
+					}
 					minrtt := time.Millisecond
 					if conf.Ping {
 						// ping ip
@@ -175,7 +160,6 @@ func UdpScan(conf *Conf) {
 			}()
 		}
 
-		// result handler
 		go func() {
 			file := resultFile(conf.CSV)
 			defer file.Close()
@@ -189,31 +173,11 @@ func UdpScan(conf *Conf) {
 			}
 		}()
 
-		file, _ := os.ReadFile(conf.IplistPath)
-		for iprange := range strings.Lines(string(file)) {
-			if iprange == "" || iprange == " " {
-				continue
-			}
-			if conf.LinearScan.N3 > 0 {
-				// With N3
-				for n3 := range conf.LinearScan.N3 {
-					for n4 := range conf.LinearScan.N4 {
-						ip_parts := strings.Split(strings.TrimSpace(iprange), ".")
-						ip_ch <- fmt.Sprintf("%s.%s.%d.%d", ip_parts[0], ip_parts[1], n3, n4)
-					}
-				}
-			} else {
-				if conf.LinearScan.N4 == 0 {
-					ip_ch <- strings.TrimSpace(iprange)
-				} else {
-					for n4 := range conf.LinearScan.N4 {
-						ip_parts := strings.Split(strings.TrimSpace(iprange), ".")
-						ip_ch <- fmt.Sprintf("%s.%s.%s.%d", ip_parts[0], ip_parts[1], ip_parts[2], n4)
-					}
-				}
-			}
+		for _, ip := range ips {
+			ip_ch <- ip
 		}
-		time.Sleep(time.Second * 3)
+
+		time.Sleep(time.Duration(conf.Maxlatency) * time.Millisecond)
 	}
 }
 

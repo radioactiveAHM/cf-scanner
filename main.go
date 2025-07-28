@@ -27,12 +27,6 @@ import (
 	utls "github.com/refraction-networking/utls"
 )
 
-type Linear struct {
-	Enable bool `json:"Enable"`
-	N3     int  `json:"N3"`
-	N4     int  `json:"N4"`
-}
-
 type DS struct {
 	Enable         bool   `json:"Enable"`
 	DomainAsSNI    bool   `json:"DomainAsSNI"`
@@ -100,7 +94,7 @@ type Conf struct {
 	TLS                TLSConfig           `json:"TLS"`
 	HTTP3              bool                `json:"HTTP/3"`
 	Noise              NoiseConfig         `json:"Noise"`
-	LinearScan         Linear              `json:"LinearScan"`
+	LinearScan         bool                `json:"LinearScan"`
 	DomainScan         DS                  `json:"DomainScan"`
 	Padding            bool                `json:"Padding"`
 	PaddingSize        string              `json:"PaddingSize"`
@@ -121,9 +115,26 @@ func main() {
 		log.Fatalln(conf_err.Error())
 	}
 
+	var ips []string
+	switch conf.IpVersion {
+	case "v4":
+		// Generate IPs from CIDRs
+		color.Yellow("Generating IPs\n")
+		ips = GenIPs(conf.IplistPath, conf.IgnoreRange)
+	case "v6":
+		// Load CIDRs into list and generate random IPv6 during scan
+		file, ipListFileErr := os.ReadFile(conf.IplistPath)
+		if ipListFileErr != nil {
+			log.Fatalln(ipListFileErr)
+		}
+		ips = strings.Split(string(file), "\n")
+	default:
+		log.Fatalln("Invalid IP version")
+	}
+
 	if conf.UdpScan.Enable {
 		color.Blue("【ＵＤＰ Ｓｃａｎ】\n")
-		UdpScan(&conf)
+		UdpScan(&conf, ips)
 		return
 	}
 
@@ -141,18 +152,13 @@ func main() {
 			conf.Ports = append(conf.Ports, 80)
 		}
 	}
+
 	color.Green("【ＨＴＴＰ Ｓｃａｎ】\n")
 	if !conf.DomainScan.Enable {
-		if !conf.LinearScan.Enable {
+		if !conf.LinearScan {
 			ch := make(chan string, conf.Goroutines)
 			for range conf.Goroutines {
 				go func() {
-					// Load IP list file
-					file, ipListFileErr := os.ReadFile(conf.IplistPath)
-					if ipListFileErr != nil {
-						log.Fatalln(ipListFileErr)
-					}
-					ranges := strings.Split(string(file), "\n")
 					var client *http.Client
 					if conf.TLS.Enable {
 						if conf.HTTP3 {
@@ -165,25 +171,14 @@ func main() {
 					}
 					for range conf.Scans {
 						ip := ""
-						// pick an ip
-						if conf.IpVersion == "v4" {
-							n4 := strconv.Itoa(rand.Intn(255))
-							randomRange := ranges[rand.Intn(len(ranges))]
-							if randomRange == "" || randomRange == " " || ignore(randomRange, conf.IgnoreRange) {
+						if conf.IpVersion == "v6" {
+							ipv6, e := randomIPv6FromCIDR(strings.TrimSpace(ips[rand.Intn(len(ips))]))
+							if e != nil {
 								continue
 							}
-							ip_parts := strings.Split(strings.TrimSpace(randomRange), ".")
-							ip = fmt.Sprintf("%s.%s.%s.%s", ip_parts[0], ip_parts[1], ip_parts[2], n4)
-						} else if conf.IpVersion == "v6" {
-							ops := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f", ""}
-							randomRange := ranges[rand.Intn(len(ranges))]
-							if randomRange == "" || randomRange == " " {
-								continue
-							}
-							selected := strings.TrimSpace(randomRange)
-							ip = "[" + selected + ops[rand.Intn(len(ops))] + ops[rand.Intn(len(ops))] + ops[rand.Intn(len(ops))] + ops[rand.Intn(len(ops))] + "]"
+							ip = fmt.Sprintf("[%s]", ipv6.String())
 						} else {
-							log.Fatalln("Invalid IP version")
+							ip = ips[rand.Intn(len(ips))]
 						}
 
 						minrtt := time.Millisecond
@@ -333,9 +328,10 @@ func main() {
 					}
 
 					for {
-						ip := <-ip_ch
-						// ping ip
-
+						ip, e := <-ip_ch
+						if !e {
+							break
+						}
 						minrtt := time.Millisecond
 						if conf.Ping {
 							pinger, ping_err := probing.NewPinger(ip)
@@ -440,7 +436,6 @@ func main() {
 				}()
 			}
 
-			// result handler
 			go func() {
 				file := resultFile(conf.CSV)
 				defer file.Close()
@@ -454,31 +449,11 @@ func main() {
 				}
 			}()
 
-			file, _ := os.ReadFile(conf.IplistPath)
-			for iprange := range strings.Lines(string(file)) {
-				if iprange == "" || iprange == " " {
-					continue
-				}
-				if conf.LinearScan.N3 > 0 {
-					// With N3
-					for n3 := range conf.LinearScan.N3 {
-						for n4 := range conf.LinearScan.N4 {
-							ip_parts := strings.Split(strings.TrimSpace(iprange), ".")
-							ip_ch <- fmt.Sprintf("%s.%s.%d.%d", ip_parts[0], ip_parts[1], n3, n4)
-						}
-					}
-				} else {
-					if conf.LinearScan.N4 == 0 {
-						ip_ch <- strings.TrimSpace(iprange)
-					} else {
-						for n4 := range conf.LinearScan.N4 {
-							ip_parts := strings.Split(strings.TrimSpace(iprange), ".")
-							ip_ch <- fmt.Sprintf("%s.%s.%s.%d", ip_parts[0], ip_parts[1], ip_parts[2], n4)
-						}
-					}
-				}
+			for _, ip := range ips {
+				ip_ch <- ip
 			}
-			time.Sleep(time.Second * 3)
+
+			time.Sleep(time.Duration(conf.Maxlatency) * time.Millisecond)
 		}
 	} else {
 		// Domain Scan
@@ -668,17 +643,6 @@ func match(headers http.Header, tomatch map[string]string) bool {
 	}
 
 	return true
-}
-
-func ignore(ip string, ignoringList []string) bool {
-	n1 := strings.Split(ip, ".")[0]
-	for _, ig := range ignoringList {
-		ignoren1 := strings.Split(ig, ".")[0]
-		if n1 == ignoren1 {
-			return true
-		}
-	}
-	return false
 }
 
 func fgen(f string) utls.ClientHelloID {

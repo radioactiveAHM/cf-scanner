@@ -16,7 +16,7 @@
 	"Maxlatency": 1000,
 	"Jitter": true,
 	"MaxJitter": 20,
-	"JitterInterval": 200,
+	"JitterInterval": 50,
 	"IpVersion": "v4",
 	"IplistPath": "ipv4.txt",
 	"IgnoreRange": [],
@@ -36,11 +36,7 @@
 		"Packet": "str://meow",
 		"Sleep": 500
 	},
-	"LinearScan": {
-		"Enable": false,
-		"N3": null,
-		"N4": 256
-	},
+	"LinearScan": false,
 	"DomainScan": {
 		"Enable": false,
 		"DomainAsSNI": false,
