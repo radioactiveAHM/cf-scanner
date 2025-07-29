@@ -12,8 +12,7 @@ Cloudflare scanner
 
 ## Notes
 
-- Get latest [ipv4.txt](https://github.com/compassvpn/cf-tools/releases/latest) from [cf-tools](https://github.com/compassvpn/cf-tools).
-- The previous `ipv4.txt` is `ipv4_old.txt`.
+- To fetch the latest `ipv4.txt`, delete the existing file. It will be automatically downloaded from the [cf-tools latest release](https://github.com/compassvpn/cf-tools/releases/latest). If the download fails, it will gracefully fall back to `ipv4_old.txt`.
 
 ## features
 

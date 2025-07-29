@@ -115,6 +115,16 @@ func main() {
 		log.Fatalln(conf_err.Error())
 	}
 
+	// Download ipv4.txt if not exist
+	_, exist := os.Stat("ipv4.txt")
+	if exist != nil {
+		e := GithubAPI("https://api.github.com/repos/compassvpn/cf-tools/releases/latest", "all_cf_v4.txt", "ipv4.txt")
+		if e != nil {
+			log.Println("Failed to download ipv4.txt: ", e, "\nFallback to ipv4_old.txt")
+			conf.IplistPath = "ipv4_old.txt"
+		}
+	}
+
 	var ips []string
 	switch conf.IpVersion {
 	case "v4":
