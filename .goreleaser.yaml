@@ -27,6 +27,11 @@ builds:
       - amd64
       - arm
       - arm64
+    goarm64:
+      - v9.0
+      - v8.0
+    goarm:
+      - 7
 
 archives:
   - formats: [tar.gz]
