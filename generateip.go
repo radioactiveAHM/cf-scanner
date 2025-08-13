@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func GenIPsFromCIDR(netCIDR string, subnetMaskSize int, ignoreRange []string) ([]string, error) {
+func GenIPsFromCIDR(netCIDR string, subnetMaskSize int, ignoreRange []string, allowRange []string) ([]string, error) {
 	prefix, err := netip.ParsePrefix(netCIDR)
 
 	if err != nil {
@@ -27,6 +27,16 @@ func GenIPsFromCIDR(netCIDR string, subnetMaskSize int, ignoreRange []string) ([
 		}
 	}
 
+	for _, allowPrefixStr := range allowRange {
+		allowPrefix, err := netip.ParsePrefix(allowPrefixStr)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if !allowPrefix.Overlaps(prefix) {
+			return []string{}, nil
+		}
+	}
+
 	var ips []string
 	for ip := prefix.Addr(); prefix.Contains(ip); ip = ip.Next() {
 		ips = append(ips, ip.String())
@@ -35,7 +45,7 @@ func GenIPsFromCIDR(netCIDR string, subnetMaskSize int, ignoreRange []string) ([
 }
 
 // ipv4filepath string
-func GenIPs(ipv4FilePath string, ignoreRange []string) []string {
+func GenIPs(ipv4FilePath string, ignoreRange []string, allowRange []string) []string {
 	var allv4 []string
 
 	file, ipListFileErr := os.ReadFile(ipv4FilePath)
@@ -44,7 +54,7 @@ func GenIPs(ipv4FilePath string, ignoreRange []string) []string {
 	}
 
 	for cidr := range strings.Lines(string(file)) {
-		ips, e := GenIPsFromCIDR(strings.TrimSpace(cidr), 24, ignoreRange)
+		ips, e := GenIPsFromCIDR(strings.TrimSpace(cidr), 24, ignoreRange, allowRange)
 		if e != nil {
 			continue
 		}

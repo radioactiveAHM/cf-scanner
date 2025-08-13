@@ -91,6 +91,7 @@ type Conf struct {
 	IpVersion          string              `json:"IpVersion"`
 	IplistPath         string              `json:"IplistPath"`
 	IgnoreRange        []string            `json:"IgnoreRange"`
+	AllowRange         []string            `json:"AllowRange"`
 	TLS                TLSConfig           `json:"TLS"`
 	HTTP3              bool                `json:"HTTP/3"`
 	Noise              NoiseConfig         `json:"Noise"`
@@ -130,7 +131,7 @@ func main() {
 	case "v4":
 		// Generate IPs from CIDRs
 		color.Yellow("Generating IPs\n")
-		ips = GenIPs(conf.IplistPath, conf.IgnoreRange)
+		ips = GenIPs(conf.IplistPath, conf.IgnoreRange, conf.AllowRange)
 	case "v6":
 		// Load CIDRs into list and generate random IPv6 during scan
 		file, ipListFileErr := os.ReadFile(conf.IplistPath)

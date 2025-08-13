@@ -20,6 +20,7 @@
 	"IpVersion": "v4",
 	"IplistPath": "ipv4.txt",
 	"IgnoreRange": [],
+	"AllowRange": [],
 	"TLS": {
 		"Enable": true,
 		"SNI": "cp.cloudflare.com",

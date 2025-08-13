@@ -47,7 +47,7 @@ func GithubAPI(api string, fileName string, saveAs string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("Response status code: %d", resp.StatusCode)
+		return fmt.Errorf("response status code: %d", resp.StatusCode)
 	}
 
 	respBuffer, readErr := io.ReadAll(resp.Body)
@@ -92,6 +92,6 @@ func GithubAPI(api string, fileName string, saveAs string) error {
 		}
 	}
 
-	return fmt.Errorf("Failed to get ipv4.txt")
+	return fmt.Errorf("failed to get ipv4.txt")
 
 }
