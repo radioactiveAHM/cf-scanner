@@ -51,6 +51,7 @@
 	"CSV": false,
 	"DownloadTest": {
 		"Enable": false,
+		"SeparateConnection": false,
 		"Url": "https://speed.cloudflare.com/__down?bytes=10000000",
 		"SNI": "cp.cloudflare.com",
 		"TargetBytes": 5000000,

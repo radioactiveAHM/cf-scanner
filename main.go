@@ -43,11 +43,12 @@ type NoiseConfig struct {
 }
 
 type DownloadConfig struct {
-	Enable      bool   `json:"Enable"`
-	Url         string `json:"Url"`
-	SNI         string `json:"SNI"`
-	TargetBytes int    `json:"TargetBytes"`
-	Timeout     int    `json:"Timeout"`
+	Enable             bool   `json:"Enable"`
+	SeparateConnection bool   `json:"SeparateConnection"`
+	Url                string `json:"Url"`
+	SNI                string `json:"SNI"`
+	TargetBytes        int    `json:"TargetBytes"`
+	Timeout            int    `json:"Timeout"`
 }
 
 type UtlsConfig struct {

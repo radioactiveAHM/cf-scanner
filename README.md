@@ -75,6 +75,7 @@ go build -ldflags "-w -s"
  "IpVersion": "v4", // IP version (`v4` or `v6`).
  "IplistPath": "ipv4.txt", // Path to the file containing a list of IP addresses (e.g., `ipv4.txt`).
  "IgnoreRange": [], // List of IP ranges to ignore. (e.g., `["172.0.0.0/8", "104.0.0.0/8"]`).
+ "AllowRange": [], // List of IP ranges to allow. (e.g., `["192.0.0.0/8", "8.14.0.0/16"]`).
  "TLS": {
    "Enable": true,
    "SNI": "cp.cloudflare.com", // The SNI value to use during the TLS handshake.
@@ -105,6 +106,7 @@ go build -ldflags "-w -s"
  "CSV": false, // CSV format result.
  "DownloadTest": {
     "Enable": false, // Enable the download speed test.
+    "SeparateConnection": false, // Open new connection for download speed test. Enable for H3.
     "Url": "https://speed.cloudflare.com/__down?bytes=10000000", // Target URL for download.
     "SNI": "cp.cloudflare.com", // The SNI value to use during the TLS handshake for DownloadTest.
     "TargetBytes": 5000000, // Expected data in bytes; if not met, report as JAMMED.

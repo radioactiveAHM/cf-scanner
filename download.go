@@ -18,8 +18,7 @@ func downloadTest(preclient *http.Client, conf *Conf, ip string, fingerprint utl
 	}
 
 	var client *http.Client
-	if conf.TLS.SNI == conf.DownloadTest.SNI {
-		// Use same connection if SNI is same
+	if !conf.DownloadTest.SeparateConnection {
 		client = preclient
 	} else {
 		if configUrl.Scheme == "https" {
