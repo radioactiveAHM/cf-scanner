@@ -101,7 +101,7 @@ go build -ldflags "-w -s"
     "SkipIPV6": true, // Skip IPv6 as result of resolving domain.
     "DomainListPath": "cloudfalare-domains.txt" // Path to the file containing a list of domains
  },
- "Padding": true, // Enable padding in HTTP requests by adding random text as cookies. This helps eliminate fixed-size requests, enhancing security and privacy.
+ "Padding": true, // Enable padding in HTTP requests by adding random text as cookies. This helps eliminate fixed-size requests.
  "PaddingSize": "1-500", // Padding size range.
  "CSV": false, // CSV format result.
  "DownloadTest": {

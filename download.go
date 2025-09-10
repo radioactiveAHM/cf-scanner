@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/quic-go/quic-go"
 	utls "github.com/refraction-networking/utls"
 )
 
@@ -23,7 +24,16 @@ func downloadTest(preclient *http.Client, conf *Conf, ip string, fingerprint utl
 	} else {
 		if configUrl.Scheme == "https" {
 			if conf.HTTP3 {
-				client = h3transporter(conf, &conf.DownloadTest.SNI)
+				client = h3transporter(
+					conf,
+					&conf.DownloadTest.SNI,
+					&quic.Config{
+						InitialStreamReceiveWindow:     1024 * 1024 * 8,
+						MaxStreamReceiveWindow:         1024 * 1024 * 16,
+						InitialConnectionReceiveWindow: 1024 * 1024 * 32,
+						MaxConnectionReceiveWindow:     1024 * 1024 * 64,
+					},
+				)
 			} else {
 				if conf.TLS.Utls.Enable {
 					uclient, utlsE := utlsTransporter(conf, fingerprint, &conf.DownloadTest.SNI, ip)

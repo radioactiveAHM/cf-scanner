@@ -174,7 +174,7 @@ func main() {
 					var client *http.Client
 					if conf.TLS.Enable {
 						if conf.HTTP3 {
-							client = h3transporter(&conf, nil)
+							client = h3transporter(&conf, nil, nil)
 						} else {
 							client = tlsTransporter(&conf, nil)
 						}
@@ -331,7 +331,7 @@ func main() {
 					var client *http.Client
 					if conf.TLS.Enable {
 						if conf.HTTP3 {
-							client = h3transporter(&conf, nil)
+							client = h3transporter(&conf, nil, nil)
 						} else {
 							client = tlsTransporter(&conf, nil)
 						}
@@ -544,7 +544,7 @@ func main() {
 							var client *http.Client
 							if conf.TLS.Enable {
 								if conf.HTTP3 {
-									client = h3transporter(&conf, &sni)
+									client = h3transporter(&conf, &sni, nil)
 								} else {
 									client = tlsTransporter(&conf, &sni)
 								}
@@ -717,7 +717,7 @@ func resultFile(csv bool) *os.File {
 	}
 }
 
-func h3transporter(conf *Conf, sni *string) *http.Client {
+func h3transporter(conf *Conf, sni *string, qc *quic.Config) *http.Client {
 	if sni == nil {
 		sni = &conf.TLS.SNI
 	}
@@ -726,6 +726,7 @@ func h3transporter(conf *Conf, sni *string) *http.Client {
 	var h3tr http3.Transport
 	if conf.Noise.Enable {
 		h3tr = http3.Transport{
+			QUICConfig:      qc,
 			TLSClientConfig: &tconf,
 			Dial: func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
 				udp, udpErr := net.ListenPacket("udp", "0.0.0.0:0")
