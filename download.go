@@ -82,6 +82,7 @@ func downloadTest(preclient *http.Client, conf *Conf, ip string, fingerprint utl
 
 		if read < conf.DownloadTest.TargetBytes {
 			ch <- "JAMMED"
+			return
 		}
 
 		latency := float32(elapsed.UnixMilli()-start.UnixMilli()) / 1000
