@@ -64,14 +64,21 @@ go build -ldflags "-w -s"
     "Server": "cloudflare"
  },
  "ResponseStatusCode": [200, 204], // Acceptable status codes.
- "Ping": true, // Enable ping IP.
- "MaxPing": 200, // Maximum acceptable ping time (in milliseconds).
+ "Ping": {
+   "Enable": true, // Enable ping IP.
+   "MaxPing": 300, // Maximum acceptable ping time (in milliseconds).
+   "Privileged": false, // SetPrivileged sets the type of ping pinger will send. false means pinger will send an "unprivileged" UDP ping. true means pinger will send a "privileged" raw ICMP ping. Setting to true requires that it be run with super-user privileges.
+   "Size": 64 // Pinger packet size
+ },
  "Goroutines": 8, // Number of concurrent goroutines for scanning.
  "Scans": 6000, // Total number of scans to perform per goroutine.
  "Maxlatency": 1000, // Maximum acceptable latency (in milliseconds).
- "Jitter": true, // Enable jitter calculation.
- "MaxJitter": 20, // Acceptable jitter.
- "JitterInterval": 50, // Sleep time interval between jitter calculations (in milliseconds).
+ "Jitter": {
+   "Enable": true, // Enable jitter calculation.
+   "MaxJitter": 20.0, // Maximum acceptable jitter.
+   "Samples": 5, // Number of samples to calculate average jitter.
+   "Interval": 200 // Delay (in ms) between consecutive jitter samples.
+ },
  "IpVersion": "v4", // IP version (`v4` or `v6`).
  "IplistPath": "ipv4.txt", // Path to the file containing a list of IP addresses (e.g., `ipv4.txt`).
  "IgnoreRange": [], // List of IP ranges to ignore. (e.g., `["172.0.0.0/8", "104.0.0.0/8"]`).

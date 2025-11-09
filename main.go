@@ -74,6 +74,20 @@ type UdpScanConfig struct {
 	Packets []UdpPayload `json:"Packets"`
 }
 
+type JitterConfig struct {
+	Enable    bool    `json:"Enable"`
+	MaxJitter float64 `json:"MaxJitter"`
+	Samples   int     `json:"Samples"`
+	Interval  int64   `json:"Interval"`
+}
+
+type PingConfig struct {
+	Enable     bool    `json:"Enable"`
+	MaxPing    float64 `json:"MaxPing"`
+	Privileged bool    `json:"Privileged"`
+	Size       int     `json:"Size"`
+}
+
 type Conf struct {
 	Hostname           string              `json:"Hostname"`
 	Ports              []int               `json:"Ports"`
@@ -81,14 +95,11 @@ type Conf struct {
 	Headers            map[string][]string `json:"Headers"`
 	ResponseHeader     map[string]string   `json:"ResponseHeader"`
 	ResponseStatusCode []int               `json:"ResponseStatusCode"`
-	Ping               bool                `json:"Ping"`
-	MaxPing            int                 `json:"MaxPing"`
+	Ping               PingConfig          `json:"Ping"`
 	Goroutines         int                 `json:"Goroutines"`
 	Scans              int                 `json:"Scans"`
 	Maxlatency         int64               `json:"Maxlatency"`
-	Jitter             bool                `json:"Jitter"`
-	MaxJitter          float64             `json:"MaxJitter"`
-	JitterInterval     int64               `json:"JitterInterval"`
+	Jitter             JitterConfig        `json:"Jitter"`
 	IpVersion          string              `json:"IpVersion"`
 	IplistPath         string              `json:"IplistPath"`
 	IgnoreRange        []string            `json:"IgnoreRange"`
@@ -194,11 +205,12 @@ func main() {
 						}
 
 						minrtt := time.Millisecond
-						if conf.Ping {
+						if conf.Ping.Enable {
 							// ping ip
 							pinger, ping_err := probing.NewPinger(ip)
-							pinger.SetPrivileged(true)
-							pinger.Timeout = time.Duration(conf.MaxPing) * time.Millisecond
+							pinger.SetPrivileged(conf.Ping.Privileged)
+							pinger.Size = conf.Ping.Size
+							pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
 							if ping_err != nil {
 								color.Red("PING: %s", ping_err)
 								continue
@@ -210,7 +222,7 @@ func main() {
 								continue
 							}
 
-							if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.MaxPing)*time.Millisecond) {
+							if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.Ping.MaxPing)*time.Millisecond) {
 								color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
 								continue
 							}
@@ -251,10 +263,10 @@ func main() {
 								// Calc jiiter
 								jitter_str := "Null"
 								download_test := "Null"
-								if conf.Jitter {
+								if conf.Jitter.Enable {
 									latencies := []float64{}
 									jammed := false
-									for range 5 {
+									for range conf.Jitter.Samples {
 										s := time.Now()
 										// send request
 										_, http_err := client.Do(&req)
@@ -265,8 +277,8 @@ func main() {
 											break
 										}
 										latencies = append(latencies, float64(latency))
-										if conf.JitterInterval > 0 {
-											time.Sleep(time.Millisecond * time.Duration(conf.JitterInterval))
+										if conf.Jitter.Interval > 0 {
+											time.Sleep(time.Millisecond * time.Duration(conf.Jitter.Interval))
 										}
 									}
 									if jammed {
@@ -274,7 +286,7 @@ func main() {
 										continue
 									}
 									jitter := Calc_jitter(latencies)
-									if jitter > conf.MaxJitter {
+									if jitter > conf.Jitter.MaxJitter {
 										color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
 										continue
 									}
@@ -345,10 +357,12 @@ func main() {
 							break
 						}
 						minrtt := time.Millisecond
-						if conf.Ping {
+						if conf.Ping.Enable {
+							// ping ip
 							pinger, ping_err := probing.NewPinger(ip)
-							pinger.SetPrivileged(true)
-							pinger.Timeout = time.Duration(conf.MaxPing) * time.Millisecond
+							pinger.SetPrivileged(conf.Ping.Privileged)
+							pinger.Size = conf.Ping.Size
+							pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
 							if ping_err != nil {
 								color.Red("PING: %s", ping_err)
 								continue
@@ -360,7 +374,7 @@ func main() {
 								continue
 							}
 
-							if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.MaxPing)*time.Millisecond) {
+							if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.Ping.MaxPing)*time.Millisecond) {
 								color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
 								continue
 							}
@@ -401,10 +415,10 @@ func main() {
 								// Calc jiiter
 								jitter_str := "Null"
 								download_test := "Null"
-								if conf.Jitter {
+								if conf.Jitter.Enable {
 									latencies := []float64{}
 									jammed := false
-									for range 5 {
+									for range conf.Jitter.Samples {
 										s := time.Now()
 										// send request
 										_, http_err := client.Do(&req)
@@ -415,8 +429,8 @@ func main() {
 											break
 										}
 										latencies = append(latencies, float64(latency))
-										if conf.JitterInterval > 0 {
-											time.Sleep(time.Millisecond * time.Duration(conf.JitterInterval))
+										if conf.Jitter.Interval > 0 {
+											time.Sleep(time.Millisecond * time.Duration(conf.Jitter.Interval))
 										}
 									}
 									if jammed {
@@ -424,7 +438,7 @@ func main() {
 										continue
 									}
 									jitter := Calc_jitter(latencies)
-									if jitter > conf.MaxJitter {
+									if jitter > conf.Jitter.MaxJitter {
 										color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
 										continue
 									}
@@ -500,11 +514,12 @@ func main() {
 						}
 
 						minrtt := time.Millisecond
-						if conf.Ping {
+						if conf.Ping.Enable {
 							// ping ip
 							pinger, ping_err := probing.NewPinger(ip.String())
 							pinger.SetPrivileged(true)
-							pinger.Timeout = time.Duration(conf.MaxPing) * time.Millisecond
+							pinger.Size = conf.Ping.Size
+							pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
 							if ping_err != nil {
 								color.Red("PING: %s", ping_err)
 								continue
@@ -516,7 +531,7 @@ func main() {
 								continue
 							}
 
-							if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.MaxPing)*time.Millisecond) {
+							if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.Ping.MaxPing)*time.Millisecond) {
 								color.Red("PING: %s(%s)\t%s\n", domain, ip, pinger.Statistics().MinRtt)
 								continue
 							}
@@ -575,7 +590,7 @@ func main() {
 								// Calc jiiter
 								jitter_str := "Null"
 								download_test := "Null"
-								if conf.Jitter {
+								if conf.Jitter.Enable {
 									latencies := []float64{}
 									jammed := false
 									for range 5 {
@@ -589,8 +604,8 @@ func main() {
 											break
 										}
 										latencies = append(latencies, float64(latency))
-										if conf.JitterInterval > 0 {
-											time.Sleep(time.Millisecond * time.Duration(conf.JitterInterval))
+										if conf.Jitter.Interval > 0 {
+											time.Sleep(time.Millisecond * time.Duration(conf.Jitter.Interval))
 										}
 									}
 									if jammed {
@@ -598,7 +613,7 @@ func main() {
 										continue
 									}
 									jitter := Calc_jitter(latencies)
-									if jitter > conf.MaxJitter {
+									if jitter > conf.Jitter.MaxJitter {
 										color.Yellow("%s(%s)\t%s\t%d\t%f\n", domain, ip, minrtt, latency, jitter)
 										continue
 									}

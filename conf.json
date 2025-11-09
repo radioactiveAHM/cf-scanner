@@ -9,14 +9,21 @@
 		"Server": "cloudflare"
 	},
 	"ResponseStatusCode": [200, 204],
-	"Ping": true,
-	"MaxPing": 300,
+	"Ping": {
+		"Enable": true,
+		"MaxPing": 300,
+		"Privileged": true,
+		"Size": 64
+	},
 	"Goroutines": 8,
 	"Scans": 6000,
 	"Maxlatency": 1000,
-	"Jitter": true,
-	"MaxJitter": 20,
-	"JitterInterval": 50,
+	"Jitter": {
+		"Enable": true,
+		"MaxJitter": 20.0,
+		"Samples": 5,
+		"Interval": 200
+	},
 	"IpVersion": "v4",
 	"IplistPath": "ipv4.txt",
 	"IgnoreRange": [],

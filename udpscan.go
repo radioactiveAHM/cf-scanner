@@ -38,11 +38,12 @@ func UdpScan(conf *Conf, ips []string) {
 					}
 
 					minrtt := time.Millisecond
-					if conf.Ping {
+					if conf.Ping.Enable {
 						// ping ip
 						pinger, ping_err := probing.NewPinger(ip)
-						pinger.SetPrivileged(true)
-						pinger.Timeout = time.Duration(conf.MaxPing) * time.Millisecond
+						pinger.SetPrivileged(conf.Ping.Privileged)
+						pinger.Size = conf.Ping.Size
+						pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
 						if ping_err != nil {
 							color.Red("PING: %s", ping_err)
 							continue
@@ -54,7 +55,7 @@ func UdpScan(conf *Conf, ips []string) {
 							continue
 						}
 
-						if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.MaxPing)*time.Millisecond) {
+						if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.Ping.MaxPing)*time.Millisecond) {
 							color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
 							continue
 						}
@@ -117,11 +118,12 @@ func UdpScan(conf *Conf, ips []string) {
 						break
 					}
 					minrtt := time.Millisecond
-					if conf.Ping {
+					if conf.Ping.Enable {
 						// ping ip
 						pinger, ping_err := probing.NewPinger(ip)
-						pinger.SetPrivileged(true)
-						pinger.Timeout = time.Duration(conf.MaxPing) * time.Millisecond
+						pinger.SetPrivileged(conf.Ping.Privileged)
+						pinger.Size = conf.Ping.Size
+						pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
 						if ping_err != nil {
 							color.Red("PING: %s", ping_err)
 							continue
@@ -133,7 +135,7 @@ func UdpScan(conf *Conf, ips []string) {
 							continue
 						}
 
-						if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.MaxPing)*time.Millisecond) {
+						if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.Ping.MaxPing)*time.Millisecond) {
 							color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
 							continue
 						}
