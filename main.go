@@ -167,11 +167,13 @@ func main() {
 	}
 
 	scheme := "http"
-	if len(conf.Ports) == 0 {
-		if conf.TLS.Enable {
-			scheme = "https"
+	if conf.TLS.Enable {
+		scheme = "https"
+		if len(conf.Ports) == 0 {
 			conf.Ports = append(conf.Ports, 443)
-		} else {
+		}
+	} else {
+		if len(conf.Ports) == 0 {
 			conf.Ports = append(conf.Ports, 80)
 		}
 	}
