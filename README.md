@@ -10,6 +10,20 @@ Cloudflare scanner
 
 **This scanner can be used with any CDN, provided you have the necessary requirements, such as an IP list or domain list for scanning. By default, it is configured to target Cloudflare. [Please review the JSON configuration document below.](#configuration-parameters)**
 
+## ⚠️ IRAN ⚠️
+
+> [!CAUTION] نکات مهم برای وضعیت کنونی ایران
+
+- اسکن مبتنی بر Ping را غیرفعال کنید. بسیاری از آی‌پی‌ها به سوکت TCP پاسخ می‌دهند، حتی زمانی که Ping کار نمی‌کند. در فایل کانفیگ، در بخش Ping مقدار گزینه‌ی Enable را روی false قرار دهید.
+
+- تعداد Goroutine‌ها را بیشتر از ۸ تنظیم نکنید. در غیر این صورت، پس از چند دقیقه ممکن است اتصال اینترنت به‌طور کامل قطع شود (محدودیت اعمال‌شده از سمت اپراتور برای جلوگیری از اسکن گسترده).
+
+- حالت‌های مختلف Fingerprint را امتحان کنید. برای اپراتور ایرانسل، در محدودترین شرایط معمولاً فقط حالت chrome پاسخ می‌دهد.
+
+- مقدار IgnoreRange را خالی بگذارید تا تمام رنج‌های آی‌پی بدون استثنا اسکن شوند.
+
+- اگر سرعت اینترنت به‌شدت پایین است، مقدار MaxLatency را افزایش دهید.
+
 ## Notes
 
 - To fetch the latest `ipv4.txt`, delete the existing file. It will be automatically downloaded from the [cf-tools latest release](https://github.com/compassvpn/cf-tools/releases/latest). If the download fails, it will gracefully fall back to `ipv4_old.txt`.
