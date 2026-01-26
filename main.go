@@ -784,7 +784,7 @@ func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni *string, ad
 	defer cxCancel()
 	handshake_e := uTlsConn.HandshakeContext(cx)
 	if handshake_e != nil {
-		return nil, fmt.Errorf("%s: UTLS handshake timeout", addr)
+		return nil, fmt.Errorf("%s: UTLS handshake error: %s", addr, handshake_e)
 	}
 
 	if uTlsConn.ConnectionState().NegotiatedProtocol == "h2" {
