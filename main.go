@@ -242,7 +242,6 @@ func main() {
 								req.Header.Set("Cookie", genPadding(conf.PaddingSize))
 							}
 
-							client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
 							s := time.Now()
 							if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
 								uclient, utlsE := utlsTransporter(&conf, fingerprint, nil, ip)
@@ -252,6 +251,7 @@ func main() {
 								}
 								client = uclient
 							}
+							client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
 							// send request
 							respone, http_err := client.Do(&req)
 							e := time.Now()
@@ -394,7 +394,6 @@ func main() {
 								req.Header.Set("Cookie", genPadding(conf.PaddingSize))
 							}
 
-							client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
 							s := time.Now()
 							if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
 								uclient, utlsE := utlsTransporter(&conf, fingerprint, nil, ip)
@@ -404,6 +403,7 @@ func main() {
 								}
 								client = uclient
 							}
+							client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
 							// send request
 							respone, http_err := client.Do(&req)
 							e := time.Now()
@@ -569,7 +569,6 @@ func main() {
 								client = http.DefaultClient
 							}
 
-							client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
 							s := time.Now()
 							if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
 								uclient, utlsE := utlsTransporter(&conf, fingerprint, &sni, ip)
@@ -579,6 +578,7 @@ func main() {
 								}
 								client = uclient
 							}
+							client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
 							// send request
 							respone, http_err := client.Do(&req)
 							e := time.Now()
@@ -779,12 +779,24 @@ func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni *string, ad
 	if err != nil {
 		return nil, err
 	}
+
+	// Tls handshake with timeout
 	uTlsConn := utls.UClient(dialConn, &utls.Config{ServerName: *sni, InsecureSkipVerify: conf.TLS.Insecure}, fingerprint)
-	cx, cxCancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(conf.Maxlatency))
-	defer cxCancel()
-	handshake_e := uTlsConn.HandshakeContext(cx)
-	if handshake_e != nil {
-		return nil, fmt.Errorf("%s: UTLS handshake error: %s", addr, handshake_e)
+	handshake_chan := make(chan error)
+	cx, cancel_cx := context.WithCancel(context.Background())
+	defer cancel_cx()
+	go func() {
+		handshake_e := uTlsConn.HandshakeContext(cx)
+		handshake_chan <- handshake_e
+	}()
+
+	select {
+	case handshake_e := <-handshake_chan:
+		if handshake_e != nil {
+			return nil, fmt.Errorf("%s: UTLS handshake error: %w", addr, handshake_e)
+		}
+	case <-time.After(time.Millisecond * time.Duration(conf.Maxlatency)):
+		return nil, fmt.Errorf("%s: UTLS handshake timeout", addr)
 	}
 
 	if uTlsConn.ConnectionState().NegotiatedProtocol == "h2" {

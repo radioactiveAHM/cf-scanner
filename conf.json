@@ -35,7 +35,7 @@
 		"Alpn": ["h2", "http/1.1"],
 		"Utls": {
 			"Enable": true,
-			"Fingerprint": "firefox"
+			"Fingerprint": "chrome"
 		}
 	},
 	"HTTP/3": false,
