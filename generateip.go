@@ -27,20 +27,25 @@ func GenIPsFromCIDR(netCIDR string, subnetMaskSize int, ignoreRange []string, al
 		}
 	}
 
-	for _, allowPrefixStr := range allowRange {
-		allowPrefix, err := netip.ParsePrefix(allowPrefixStr)
-		if err != nil {
-			log.Fatalln(err)
+	var ips []string
+	if len(allowRange) > 0 {
+		for _, allowPrefixStr := range allowRange {
+			allowPrefix, err := netip.ParsePrefix(allowPrefixStr)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			if allowPrefix.Overlaps(prefix) {
+				for ip := prefix.Addr(); prefix.Contains(ip); ip = ip.Next() {
+					ips = append(ips, ip.String())
+				}
+			}
 		}
-		if !allowPrefix.Overlaps(prefix) {
-			return []string{}, nil
+	} else {
+		for ip := prefix.Addr(); prefix.Contains(ip); ip = ip.Next() {
+			ips = append(ips, ip.String())
 		}
 	}
 
-	var ips []string
-	for ip := prefix.Addr(); prefix.Contains(ip); ip = ip.Next() {
-		ips = append(ips, ip.String())
-	}
 	return ips, nil
 }
 
