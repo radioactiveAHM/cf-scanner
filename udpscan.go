@@ -42,7 +42,7 @@ func UdpScan(conf *Conf, ips []string) {
 						// ping ip
 						pinger, ping_err := probing.NewPinger(ip)
 						pinger.SetPrivileged(conf.Ping.Privileged)
-						pinger.Size = conf.Ping.Size
+						pinger.Size = randomRange(conf.Ping.Size)
 						pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
 						if ping_err != nil {
 							color.Red("PING: %s", ping_err)
@@ -122,7 +122,7 @@ func UdpScan(conf *Conf, ips []string) {
 						// ping ip
 						pinger, ping_err := probing.NewPinger(ip)
 						pinger.SetPrivileged(conf.Ping.Privileged)
-						pinger.Size = conf.Ping.Size
+						pinger.Size = randomRange(conf.Ping.Size)
 						pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
 						if ping_err != nil {
 							color.Red("PING: %s", ping_err)

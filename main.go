@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	crand "crypto/rand"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -85,7 +87,7 @@ type PingConfig struct {
 	Enable     bool    `json:"Enable"`
 	MaxPing    float64 `json:"MaxPing"`
 	Privileged bool    `json:"Privileged"`
-	Size       int     `json:"Size"`
+	Size       string  `json:"Size"`
 }
 
 type Conf struct {
@@ -211,7 +213,7 @@ func main() {
 							// ping ip
 							pinger, ping_err := probing.NewPinger(ip)
 							pinger.SetPrivileged(conf.Ping.Privileged)
-							pinger.Size = conf.Ping.Size
+							pinger.Size = randomRange(conf.Ping.Size)
 							pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
 							if ping_err != nil {
 								color.Red("PING: %s", ping_err)
@@ -239,7 +241,7 @@ func main() {
 							req.Header = maps.Clone(conf.Headers)
 							req.Header.Set("Host", conf.Hostname)
 							if conf.Padding {
-								req.Header.Set("Cookie", genPadding(conf.PaddingSize))
+								req.Header.Set("Cookie", RandomString(conf.PaddingSize))
 							}
 
 							s := time.Now()
@@ -363,7 +365,7 @@ func main() {
 							// ping ip
 							pinger, ping_err := probing.NewPinger(ip)
 							pinger.SetPrivileged(conf.Ping.Privileged)
-							pinger.Size = conf.Ping.Size
+							pinger.Size = randomRange(conf.Ping.Size)
 							pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
 							if ping_err != nil {
 								color.Red("PING: %s", ping_err)
@@ -391,7 +393,7 @@ func main() {
 							req.Header = maps.Clone(conf.Headers)
 							req.Header.Set("Host", conf.Hostname)
 							if conf.Padding {
-								req.Header.Set("Cookie", genPadding(conf.PaddingSize))
+								req.Header.Set("Cookie", RandomString(conf.PaddingSize))
 							}
 
 							s := time.Now()
@@ -520,7 +522,7 @@ func main() {
 							// ping ip
 							pinger, ping_err := probing.NewPinger(ip.String())
 							pinger.SetPrivileged(true)
-							pinger.Size = conf.Ping.Size
+							pinger.Size = randomRange(conf.Ping.Size)
 							pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
 							if ping_err != nil {
 								color.Red("PING: %s", ping_err)
@@ -551,7 +553,7 @@ func main() {
 							req.Header = maps.Clone(conf.Headers)
 							req.Header.Set("Host", host)
 							if conf.Padding {
-								req.Header.Set("Cookie", genPadding(conf.PaddingSize))
+								req.Header.Set("Cookie", RandomString(conf.PaddingSize))
 							}
 
 							sni := conf.TLS.SNI
@@ -624,10 +626,10 @@ func main() {
 								if conf.DownloadTest.Enable {
 									download_test = downloadTest(client, &conf, ip, fingerprint)
 								}
-								rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, download_test)
+								rep := fmt.Sprintf("%s:\t%s\t%s\t%d\t%s\t%s\n", domain, ip, minrtt, latency, jitter_str, download_test)
 								color.Green("%s", rep)
 								if conf.CSV {
-									ch <- fmt.Sprintf("%s,%s,%d,%s,%s\n", ip, minrtt, latency, jitter_str, download_test)
+									ch <- fmt.Sprintf("%s:%s,%s,%d,%s,%s\n", domain, ip, minrtt, latency, jitter_str, download_test)
 								} else {
 									ch <- rep
 								}
@@ -695,7 +697,16 @@ func fgen(f string) utls.ClientHelloID {
 	return finger
 }
 
-func genPadding(r string) string {
+func RandomString(n string) string {
+	bytes := make([]byte, randomRange(n))
+	_, err := crand.Read(bytes)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	return base64.RawURLEncoding.EncodeToString(bytes)
+}
+
+func randomRange(r string) int {
 	ab := strings.Split(r, "-")
 	a, a_err := strconv.Atoi(ab[0])
 	if a_err != nil {
@@ -705,9 +716,8 @@ func genPadding(r string) string {
 	if b_err != nil {
 		log.Fatalln(b_err)
 	}
-	randomNumber := rand.Intn(b-a+1) + a
 
-	return strings.Repeat("X", randomNumber)
+	return rand.Intn(b-a+1) + a
 }
 
 func resultFile(csv bool) *os.File {

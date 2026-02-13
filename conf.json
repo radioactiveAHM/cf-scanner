@@ -13,7 +13,7 @@
 		"Enable": true,
 		"MaxPing": 300,
 		"Privileged": true,
-		"Size": 64
+		"Size": "24-65"
 	},
 	"Goroutines": 8,
 	"Scans": 6000,
@@ -46,7 +46,7 @@
 	},
 	"LinearScan": false,
 	"DomainScan": {
-		"Enable": false,
+		"Enable": true,
 		"DomainAsSNI": false,
 		"DomainAsHost": false,
 		"Shuffle": true,
