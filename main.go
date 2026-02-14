@@ -38,10 +38,15 @@ type DS struct {
 	DomainListPath string `json:"DomainListPath"`
 }
 
+type NoisePacket struct {
+	Type    string `json:"Type"`
+	Payload string `json:"Payload"`
+	Sleep   string `json:"Sleep"`
+}
+
 type NoiseConfig struct {
-	Enable bool   `json:"Enable"`
-	Packet string `json:"Packet"`
-	Sleep  int    `json:"Sleep"`
+	Enable  bool          `json:"Enable"`
+	Packets []NoisePacket `json:"Packets"`
 }
 
 type DownloadConfig struct {
@@ -64,16 +69,6 @@ type TLSConfig struct {
 	Insecure bool       `json:"Insecure"`
 	Alpn     []string   `json:"Alpn"`
 	Utls     UtlsConfig `json:"Utls"`
-}
-
-type UdpPayload struct {
-	Payload string `json:"Payload"`
-	Sleep   int    `json:"Sleep"`
-}
-
-type UdpScanConfig struct {
-	Enable  bool         `json:"Enable"`
-	Packets []UdpPayload `json:"Packets"`
 }
 
 type JitterConfig struct {
@@ -108,14 +103,13 @@ type Conf struct {
 	AllowRange         []string            `json:"AllowRange"`
 	TLS                TLSConfig           `json:"TLS"`
 	HTTP3              bool                `json:"HTTP/3"`
-	Noise              NoiseConfig         `json:"Noise"`
+	Noises             NoiseConfig         `json:"Noises"`
 	LinearScan         bool                `json:"LinearScan"`
 	DomainScan         DS                  `json:"DomainScan"`
 	Padding            bool                `json:"Padding"`
 	PaddingSize        string              `json:"PaddingSize"`
 	CSV                bool                `json:"CSV"`
 	DownloadTest       DownloadConfig      `json:"DownloadTest"`
-	UdpScan            UdpScanConfig       `json:"UdpScan"`
 }
 
 func main() {
@@ -155,12 +149,6 @@ func main() {
 		ips = strings.Split(string(file), "\n")
 	default:
 		log.Fatalln("Invalid IP version")
-	}
-
-	if conf.UdpScan.Enable {
-		color.Blue("【ＵＤＰ Ｓｃａｎ】\n")
-		UdpScan(&conf, ips)
-		return
 	}
 
 	fingerprint := utls.HelloChrome_Auto
@@ -751,7 +739,7 @@ func h3transporter(conf *Conf, sni *string, qc *quic.Config) *http.Client {
 
 	tconf := tls.Config{ServerName: *sni, NextProtos: []string{"h3"}, InsecureSkipVerify: conf.TLS.Insecure}
 	var h3tr http3.Transport
-	if conf.Noise.Enable {
+	if conf.Noises.Enable {
 		h3tr = http3.Transport{
 			QUICConfig:      qc,
 			TLSClientConfig: &tconf,
@@ -765,9 +753,7 @@ func h3transporter(conf *Conf, sni *string, qc *quic.Config) *http.Client {
 					return nil, uaddrErr
 				}
 				// noise
-				var packet []byte = decoder(conf.Noise.Packet)
-				udp.WriteTo(packet, uaddr)
-				time.Sleep(time.Millisecond * time.Duration(conf.Noise.Sleep))
+				SendNoises(udp, uaddr, conf.Noises.Packets)
 				return quic.Dial(
 					ctx, udp, uaddr, tlsCfg, cfg,
 				)

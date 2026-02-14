@@ -3,7 +3,9 @@
 	"Ports": [],
 	"Path": "/",
 	"Headers": {
-		"User-Agent": ["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0)"]
+		"Accept": ["text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"],
+		"Accept-Encoding": ["gzip, deflate, br, zstd"],
+		"User-Agent": ["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:147.0) Gecko/20100101 Firefox/147.0"]
 	},
 	"ResponseHeader": {
 		"Server": "cloudflare"
@@ -20,7 +22,7 @@
 	"Maxlatency": 1000,
 	"Jitter": {
 		"Enable": true,
-		"MaxJitter": 20.0,
+		"MaxJitter": 50.0,
 		"Samples": 5,
 		"Interval": 200
 	},
@@ -39,14 +41,29 @@
 		}
 	},
 	"HTTP/3": false,
-	"Noise": {
+	"Noises": {
 		"Enable": false,
-		"Packet": "str://meow",
-		"Sleep": 500
+		"Packets": [
+			{
+				"Type": "str",
+				"Payload": "GET /\r\n\r\n",
+				"Sleep": 25
+			},
+			{
+				"Type": "rand",
+				"Payload": "1-10",
+				"Sleep": 25
+			},
+			{
+				"Type": "rand",
+				"Payload": "1-20",
+				"Sleep": 25
+			}
+		]
 	},
 	"LinearScan": false,
 	"DomainScan": {
-		"Enable": true,
+		"Enable": false,
 		"DomainAsSNI": false,
 		"DomainAsHost": false,
 		"Shuffle": true,
@@ -54,7 +71,7 @@
 		"DomainListPath": "cloudfalare-domains.txt"
 	},
 	"Padding": true,
-	"PaddingSize": "1-500",
+	"PaddingSize": "1-100",
 	"CSV": false,
 	"DownloadTest": {
 		"Enable": false,
@@ -63,14 +80,5 @@
 		"SNI": "cp.cloudflare.com",
 		"TargetBytes": 5000000,
 		"Timeout": 5000
-	},
-	"UdpScan": {
-		"Enable": false,
-		"Packets": [
-			{
-				"payload": "base64://ATVweRyrGwyVXtU8NFbPgilDINuh2HUt4WbUdCQ/N8hbnFXND4SoNbP/JVfsOg+WcASDO5MKq9w8HWp0Azbb60kgSSaK+dc1CA0Jm1qbRRl+ukR/g68Ae7iYjR3tAXzBSU8HYLeMQ3rmx6yS7FF+bIfyXHZ5vSnbUlIDRM53Q5+YRcDoAAAAAAAAAAAAAAAAAAAAAA==",
-				"sleep": 0
-			}
-		]
 	}
 }

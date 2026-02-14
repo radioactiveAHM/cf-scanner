@@ -104,7 +104,7 @@ go build -ldflags "-w -s"
    "Enable": true, // Enable ping IP.
    "MaxPing": 300, // Maximum acceptable ping time (in milliseconds).
    "Privileged": false, // SetPrivileged sets the type of ping pinger will send. false means pinger will send an "unprivileged" UDP ping. true means pinger will send a "privileged" raw ICMP ping. Setting to true requires that it be run with super-user privileges.
-   "Size": 64 // Pinger packet size
+   "Size": "24-64" // Pinger packet size
  },
  "Goroutines": 8, // Number of concurrent goroutines for scanning.
  "Scans": 6000, // Total number of scans to perform per goroutine.
@@ -129,11 +129,21 @@ go build -ldflags "-w -s"
     "Fingerprint": "chrome" // Supported fingerprints are firefox, edge, chrome, 360 and ios.
    }
  },
- "HTTP/3": false, // Use HTTP version 3 or not.
+ "HTTP/3": false, // Enable HTTP version 3.
  "Noise": {
     "Enable": false, // Enable UDP noise injection for HTTP/3.
-    "Packet": "str://meow", // Noise payload to send. `str`, `base64` and `hex` formats are supported.
-    "Sleep": 500, // Delay in milliseconds after sending noise.
+    "Packets": [
+      {
+         "Type": "rand", // Noise payload type. `str`, `base64`, `hex` and `rand` types are supported.
+         "Payload": "1-10", // Noise payload
+         "Sleep": "20-50" // Delay in milliseconds after sending noise.
+      },
+      {
+         "Type": "rand",
+         "Payload": "1-50",
+         "Sleep": "20-50"
+      }
+    ]
  },
  "LinearScan": false, // Enable linear scanning.
  "DomainScan": {
@@ -154,16 +164,6 @@ go build -ldflags "-w -s"
     "SNI": "cp.cloudflare.com", // The SNI value to use during the TLS handshake for DownloadTest.
     "TargetBytes": 5000000, // Expected data in bytes; if not met, report as JAMMED.
     "Timeout": 5000 // Timeout duration in milliseconds before aborting the download.
- },
- "UdpScan": {
-   "Enable": false, // Enable or disable the UDP scan
-   "Packets": [ // Defines a sequence of packets to send. Supports base64, plain string ("str"), and hexadecimal ("hex") formats.
-      {
-         // The packet payload data. This example targets Cloudflare Warp using a WireGuard-formatted packet. `str`, `base64` and `hex` formats are supported.
-         "payload": "base64://ATVweRyrGwyVXtU8NFbPgilDINuh2HUt4WbUdCQ/N8hbnFXND4SoNbP/JVfsOg+WcASDO5MKq9w8HWp0Azbb60kgSSaK+dc1CA0Jm1qbRRl+ukR/g68Ae7iYjR3tAXzBSU8HYLeMQ3rmx6yS7FF+bIfyXHZ5vSnbUlIDRM53Q5+YRcDoAAAAAAAAAAAAAAAAAAAAAA==",
-         "sleep": 0 // Optional delay (in milliseconds) after sending this packet.
-      }
-   ]
  }
 }
 ```
