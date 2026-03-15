@@ -1,4 +1,6 @@
 {
+	"LogErr": true,
+	"Interface": null,
 	"Hostname": "cp.cloudflare.com",
 	"Ports": [],
 	"Path": "/",

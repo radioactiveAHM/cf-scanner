@@ -86,6 +86,8 @@ type PingConfig struct {
 }
 
 type Conf struct {
+	LogErr             bool                `json:"LogErr"`
+	Interface          string              `json:"Interface"`
 	Hostname           string              `json:"Hostname"`
 	Ports              []int               `json:"Ports"`
 	Path               string              `json:"Path"`
@@ -134,13 +136,17 @@ func main() {
 		}
 	}
 
+	var ifaceIP net.IP
+
 	var ips []string
 	switch conf.IpVersion {
 	case "v4":
+		ifaceIP = net.ParseIP("0.0.0.0")
 		// Generate IPs from CIDRs
 		color.Yellow("Generating IPs\n")
 		ips = GenIPs(conf.IplistPath, conf.IgnoreRange, conf.AllowRange)
 	case "v6":
+		ifaceIP = net.ParseIP("[::]")
 		// Load CIDRs into list and generate random IPv6 during scan
 		file, ipListFileErr := os.ReadFile(conf.IplistPath)
 		if ipListFileErr != nil {
@@ -150,6 +156,37 @@ func main() {
 	default:
 		log.Fatalln("Invalid IP version")
 	}
+
+	if conf.Interface != "" {
+		iface, getIfaceErr := net.InterfaceByName(conf.Interface)
+		if getIfaceErr != nil {
+			log.Println(getIfaceErr)
+		}
+
+		addrs, getAddrsErr := iface.Addrs()
+		if getAddrsErr != nil {
+			log.Println(getAddrsErr)
+		}
+
+		for _, ip := range addrs {
+			ip, _, e := net.ParseCIDR(ip.String())
+			if e != nil {
+				continue
+			}
+			switch conf.IpVersion {
+			case "v4":
+				if ip.To4() != nil {
+					ifaceIP = ip
+				}
+			case "v6":
+				if ip.To4() == nil {
+					ifaceIP = ip
+				}
+			}
+		}
+	}
+
+	color.Yellow("Interface IP: %s", ifaceIP.String())
 
 	fingerprint := utls.HelloChrome_Auto
 	if conf.TLS.Utls.Enable {
@@ -168,6 +205,7 @@ func main() {
 		}
 	}
 
+	LOG := conf.LogErr
 	color.Green("【ＨＴＴＰ Ｓｃａｎ】\n")
 	if !conf.DomainScan.Enable {
 		if !conf.LinearScan {
@@ -178,7 +216,8 @@ func main() {
 					if conf.TLS.Enable {
 						if conf.HTTP3 {
 							client = h3transporter(&conf, nil, nil)
-						} else {
+						} else if !conf.TLS.Utls.Enable {
+							fmt.Println("simple tlsTransporter called")
 							client = tlsTransporter(&conf, nil)
 						}
 					} else {
@@ -199,23 +238,26 @@ func main() {
 						minrtt := time.Millisecond
 						if conf.Ping.Enable {
 							// ping ip
-							pinger, ping_err := probing.NewPinger(ip)
+							pinger := probing.New(ip)
+							if conf.Interface != "" {
+								pinger.InterfaceName = conf.Interface
+							}
 							pinger.SetPrivileged(conf.Ping.Privileged)
 							pinger.Size = randomRange(conf.Ping.Size)
 							pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
-							if ping_err != nil {
-								color.Red("PING: %s", ping_err)
-								continue
-							}
 							pinger.Count = 1
 							pinging_err := pinger.Run()
 							if pinging_err != nil {
-								color.Red("PING: %s", pinging_err)
+								if LOG {
+									color.Red("PING: %s", pinging_err)
+								}
 								continue
 							}
 
 							if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.Ping.MaxPing)*time.Millisecond) {
-								color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
+								if LOG {
+									color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
+								}
 								continue
 							}
 
@@ -234,9 +276,11 @@ func main() {
 
 							s := time.Now()
 							if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
-								uclient, utlsE := utlsTransporter(&conf, fingerprint, nil, ip)
+								uclient, utlsE := utlsTransporter(&conf, fingerprint, nil, ip, ifaceIP)
 								if utlsE != nil {
-									color.Red("%s", utlsE.Error())
+									if LOG {
+										color.Red("%s", utlsE.Error())
+									}
 									continue
 								}
 								client = uclient
@@ -247,7 +291,9 @@ func main() {
 							e := time.Now()
 							latency := e.UnixMilli() - s.UnixMilli()
 							if http_err != nil {
-								color.Red("%s", http_err.Error())
+								if LOG {
+									color.Red("%s", http_err.Error())
+								}
 								continue
 							}
 
@@ -274,7 +320,9 @@ func main() {
 										}
 									}
 									if jammed {
-										color.Red("%s\t%s\t%d\tJAMMED\n", ip, minrtt, latency)
+										if LOG {
+											color.Red("%s\t%s\t%d\tJAMMED\n", ip, minrtt, latency)
+										}
 										continue
 									}
 									jitter := Calc_jitter(latencies)
@@ -285,7 +333,7 @@ func main() {
 									jitter_str = fmt.Sprintf("%f", jitter)
 								}
 								if conf.DownloadTest.Enable {
-									download_test = downloadTest(client, &conf, ip, fingerprint)
+									download_test = downloadTest(client, &conf, ip, ifaceIP, fingerprint)
 								}
 								rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, download_test)
 								color.Green("%s", rep)
@@ -295,7 +343,9 @@ func main() {
 									ch <- rep
 								}
 							} else {
-								color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
+								if LOG {
+									color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
+								}
 							}
 						}
 					}
@@ -336,7 +386,7 @@ func main() {
 					if conf.TLS.Enable {
 						if conf.HTTP3 {
 							client = h3transporter(&conf, nil, nil)
-						} else {
+						} else if !conf.TLS.Utls.Enable {
 							client = tlsTransporter(&conf, nil)
 						}
 					} else {
@@ -351,23 +401,26 @@ func main() {
 						minrtt := time.Millisecond
 						if conf.Ping.Enable {
 							// ping ip
-							pinger, ping_err := probing.NewPinger(ip)
+							pinger := probing.New(ip)
+							if conf.Interface != "" {
+								pinger.InterfaceName = conf.Interface
+							}
 							pinger.SetPrivileged(conf.Ping.Privileged)
 							pinger.Size = randomRange(conf.Ping.Size)
 							pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
-							if ping_err != nil {
-								color.Red("PING: %s", ping_err)
-								continue
-							}
 							pinger.Count = 1
 							pinging_err := pinger.Run()
 							if pinging_err != nil {
-								color.Red("PING: %s", pinging_err)
+								if LOG {
+									color.Red("PING: %s", pinging_err)
+								}
 								continue
 							}
 
 							if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.Ping.MaxPing)*time.Millisecond) {
-								color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
+								if LOG {
+									color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
+								}
 								continue
 							}
 
@@ -386,9 +439,11 @@ func main() {
 
 							s := time.Now()
 							if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
-								uclient, utlsE := utlsTransporter(&conf, fingerprint, nil, ip)
+								uclient, utlsE := utlsTransporter(&conf, fingerprint, nil, ip, ifaceIP)
 								if utlsE != nil {
-									color.Red("%s", utlsE.Error())
+									if LOG {
+										color.Red("%s", utlsE.Error())
+									}
 									continue
 								}
 								client = uclient
@@ -399,7 +454,9 @@ func main() {
 							e := time.Now()
 							latency := e.UnixMilli() - s.UnixMilli()
 							if http_err != nil {
-								color.Red("%s", http_err.Error())
+								if LOG {
+									color.Red("%s", http_err.Error())
+								}
 								continue
 							}
 
@@ -426,7 +483,9 @@ func main() {
 										}
 									}
 									if jammed {
-										color.Red("%s\t%s\t%d\tJAMMED\n", ip, minrtt, latency)
+										if LOG {
+											color.Red("%s\t%s\t%d\tJAMMED\n", ip, minrtt, latency)
+										}
 										continue
 									}
 									jitter := Calc_jitter(latencies)
@@ -437,7 +496,7 @@ func main() {
 									jitter_str = fmt.Sprintf("%f", jitter)
 								}
 								if conf.DownloadTest.Enable {
-									download_test = downloadTest(client, &conf, ip, fingerprint)
+									download_test = downloadTest(client, &conf, ip, ifaceIP, fingerprint)
 								}
 								rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, download_test)
 								color.Green("%s", rep)
@@ -447,7 +506,9 @@ func main() {
 									res_Ch <- rep
 								}
 							} else {
-								color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
+								if LOG {
+									color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
+								}
 							}
 						}
 					}
@@ -508,23 +569,27 @@ func main() {
 						minrtt := time.Millisecond
 						if conf.Ping.Enable {
 							// ping ip
-							pinger, ping_err := probing.NewPinger(ip.String())
+							pinger := probing.New(ip.String())
+							if conf.Interface != "" {
+								pinger.InterfaceName = conf.Interface
+							}
 							pinger.SetPrivileged(true)
 							pinger.Size = randomRange(conf.Ping.Size)
 							pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
-							if ping_err != nil {
-								color.Red("PING: %s", ping_err)
-								continue
-							}
+
 							pinger.Count = 1
 							pinging_err := pinger.Run()
 							if pinging_err != nil {
-								color.Red("PING: %s", pinging_err)
+								if LOG {
+									color.Red("PING: %s", pinging_err)
+								}
 								continue
 							}
 
 							if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.Ping.MaxPing)*time.Millisecond) {
-								color.Red("PING: %s(%s)\t%s\n", domain, ip, pinger.Statistics().MinRtt)
+								if LOG {
+									color.Red("PING: %s(%s)\t%s\n", domain, ip, pinger.Statistics().MinRtt)
+								}
 								continue
 							}
 
@@ -552,7 +617,7 @@ func main() {
 							if conf.TLS.Enable {
 								if conf.HTTP3 {
 									client = h3transporter(&conf, &sni, nil)
-								} else {
+								} else if !conf.TLS.Utls.Enable {
 									client = tlsTransporter(&conf, &sni)
 								}
 							} else {
@@ -561,9 +626,11 @@ func main() {
 
 							s := time.Now()
 							if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
-								uclient, utlsE := utlsTransporter(&conf, fingerprint, &sni, ip)
+								uclient, utlsE := utlsTransporter(&conf, fingerprint, &sni, ip, ifaceIP)
 								if utlsE != nil {
-									color.Red("%s", utlsE.Error())
+									if LOG {
+										color.Red("%s", utlsE.Error())
+									}
 									continue
 								}
 								client = uclient
@@ -574,7 +641,9 @@ func main() {
 							e := time.Now()
 							latency := e.UnixMilli() - s.UnixMilli()
 							if http_err != nil {
-								color.Red("%s", http_err.Error())
+								if LOG {
+									color.Red("%s", http_err.Error())
+								}
 								continue
 							}
 
@@ -601,7 +670,9 @@ func main() {
 										}
 									}
 									if jammed {
-										color.Red("%s(%s)\t%s\t%d\tJAMMED\n", domain, ip, minrtt, latency)
+										if LOG {
+											color.Red("%s(%s)\t%s\t%d\tJAMMED\n", domain, ip, minrtt, latency)
+										}
 										continue
 									}
 									jitter := Calc_jitter(latencies)
@@ -612,7 +683,7 @@ func main() {
 									jitter_str = fmt.Sprintf("%f", jitter)
 								}
 								if conf.DownloadTest.Enable {
-									download_test = downloadTest(client, &conf, ip, fingerprint)
+									download_test = downloadTest(client, &conf, ip, ifaceIP, fingerprint)
 								}
 								rep := fmt.Sprintf("%s:\t%s\t%s\t%d\t%s\t%s\n", domain, ip, minrtt, latency, jitter_str, download_test)
 								color.Green("%s", rep)
@@ -622,7 +693,9 @@ func main() {
 									ch <- rep
 								}
 							} else {
-								color.Red("%s(%s)\t%s\tHTTP.StatusCode=%d\n", domain, ip, minrtt, respone.StatusCode)
+								if LOG {
+									color.Red("%s(%s)\t%s\tHTTP.StatusCode=%d\n", domain, ip, minrtt, respone.StatusCode)
+								}
 							}
 						}
 					}
@@ -767,11 +840,19 @@ func h3transporter(conf *Conf, sni *string, qc *quic.Config) *http.Client {
 	}
 }
 
-func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni *string, addr string) (*http.Client, error) {
+func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni *string, addr string, localIP net.IP) (*http.Client, error) {
 	if sni == nil {
 		sni = &conf.TLS.SNI
 	}
-	dialConn, err := net.DialTimeout("tcp", addr, time.Millisecond*time.Duration(conf.Maxlatency))
+
+	dialer := &net.Dialer{
+		Timeout: time.Millisecond * time.Duration(conf.Maxlatency),
+		LocalAddr: &net.TCPAddr{
+			IP: localIP,
+		},
+	}
+
+	dialConn, err := dialer.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
