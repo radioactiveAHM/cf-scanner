@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"maps"
@@ -855,31 +856,26 @@ func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni *string, ad
 
 	dialConn, err := dialer.Dial("tcp", addr)
 	if err != nil {
+		dialConn.Close()
 		return nil, err
 	}
 
 	// Tls handshake with timeout
 	uTlsConn := utls.UClient(dialConn, &utls.Config{ServerName: *sni, InsecureSkipVerify: conf.TLS.Insecure}, fingerprint)
-	handshake_chan := make(chan error)
-	cx, cancel_cx := context.WithCancel(context.Background())
-	defer cancel_cx()
-	go func() {
-		handshake_e := uTlsConn.HandshakeContext(cx)
-		handshake_chan <- handshake_e
-	}()
 
-	select {
-	case handshake_e := <-handshake_chan:
-		if handshake_e != nil {
-			return nil, fmt.Errorf("%s: UTLS handshake error: %w", addr, handshake_e)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(conf.Maxlatency))
+	defer cancel()
+	if err := uTlsConn.HandshakeContext(ctx); err != nil {
+		uTlsConn.Close()
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf("%s: UTLS handshake timeout", addr)
 		}
-	case <-time.After(time.Millisecond * time.Duration(conf.Maxlatency)):
-		return nil, fmt.Errorf("%s: UTLS handshake timeout", addr)
+		return nil, fmt.Errorf("%s: UTLS handshake error: %w", addr, err)
 	}
 
 	if uTlsConn.ConnectionState().NegotiatedProtocol == "h2" {
 		h2 := http2.Transport{
-			DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
+			DialTLSContext: func(_ context.Context, _, _ string, _ *tls.Config) (net.Conn, error) {
 				return uTlsConn, nil
 			},
 		}
@@ -888,7 +884,7 @@ func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni *string, ad
 		}, nil
 	} else {
 		h1 := http.Transport{
-			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			DialTLSContext: func(_ context.Context, _, _ string) (net.Conn, error) {
 				return uTlsConn, nil
 			},
 		}
