@@ -856,7 +856,6 @@ func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni *string, ad
 
 	dialConn, err := dialer.Dial("tcp", addr)
 	if err != nil {
-		dialConn.Close()
 		return nil, err
 	}
 
