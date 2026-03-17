@@ -22,6 +22,7 @@
 	"Goroutines": 8,
 	"Scans": 6000,
 	"Maxlatency": 1000,
+	"TcpTimeout": 1000,
 	"Jitter": {
 		"Enable": true,
 		"MaxJitter": 50.0,

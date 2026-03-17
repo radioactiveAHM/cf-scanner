@@ -98,6 +98,7 @@ type Conf struct {
 	Goroutines         int                 `json:"Goroutines"`
 	Scans              int                 `json:"Scans"`
 	Maxlatency         int64               `json:"Maxlatency"`
+	TcpTimeout         int64               `json:"TcpTimeout"`
 	Jitter             JitterConfig        `json:"Jitter"`
 	IpVersion          string              `json:"IpVersion"`
 	IplistPath         string              `json:"IplistPath"`
@@ -846,7 +847,7 @@ func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni *string, ad
 	}
 
 	dialer := &net.Dialer{
-		Timeout: time.Millisecond * time.Duration(conf.Maxlatency),
+		Timeout: time.Millisecond * time.Duration(conf.TcpTimeout),
 		LocalAddr: &net.TCPAddr{
 			IP: localIP,
 		},
