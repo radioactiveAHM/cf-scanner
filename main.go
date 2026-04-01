@@ -863,7 +863,6 @@ func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni *string, ad
 	var dialConn net.Conn
 	var err error
 	for reconnect := range conf.TLS.Utls.TcpRetry {
-		fmt.Printf("connect to %s\n", addr)
 		dialConn, err = dialer.Dial("tcp", addr)
 		if err != nil {
 			if !errors.Is(err, context.DeadlineExceeded) {
