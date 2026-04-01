@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -62,6 +63,8 @@ type DownloadConfig struct {
 type UtlsConfig struct {
 	Enable      bool   `json:"Enable"`
 	Fingerprint string `json:"Fingerprint"`
+	TcpTimeout  int64  `json:"TcpTimeout"`
+	TcpRetry    int    `json:"TcpRetry"`
 }
 
 type TLSConfig struct {
@@ -99,7 +102,6 @@ type Conf struct {
 	Goroutines         int                 `json:"Goroutines"`
 	Scans              int                 `json:"Scans"`
 	Maxlatency         int64               `json:"Maxlatency"`
-	TcpTimeout         int64               `json:"TcpTimeout"`
 	Jitter             JitterConfig        `json:"Jitter"`
 	IpVersion          string              `json:"IpVersion"`
 	IplistPath         string              `json:"IplistPath"`
@@ -848,15 +850,32 @@ func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni *string, ad
 	}
 
 	dialer := &net.Dialer{
-		Timeout: time.Millisecond * time.Duration(conf.TcpTimeout),
+		Timeout: time.Millisecond * time.Duration(conf.TLS.Utls.TcpTimeout),
 		LocalAddr: &net.TCPAddr{
 			IP: localIP,
 		},
 	}
 
-	dialConn, err := dialer.Dial("tcp", addr)
-	if err != nil {
-		return nil, err
+	if conf.Interface != "" && runtime.GOOS == "linux" {
+		BindDevice(conf, dialer)
+	}
+
+	var dialConn net.Conn
+	var err error
+	for reconnect := range conf.TLS.Utls.TcpRetry {
+		fmt.Printf("connect to %s\n", addr)
+		dialConn, err = dialer.Dial("tcp", addr)
+		if err != nil {
+			if !errors.Is(err, context.DeadlineExceeded) {
+				return nil, err
+			}
+		} else {
+			break
+		}
+
+		if reconnect+1 == conf.TLS.Utls.TcpRetry {
+			return nil, err
+		}
 	}
 
 	// Tls handshake with timeout

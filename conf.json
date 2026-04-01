@@ -5,8 +5,6 @@
 	"Ports": [],
 	"Path": "/",
 	"Headers": {
-		"Accept": ["text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"],
-		"Accept-Encoding": ["gzip, deflate, br, zstd"],
 		"User-Agent": ["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:147.0) Gecko/20100101 Firefox/147.0"]
 	},
 	"ResponseHeader": {
@@ -22,7 +20,6 @@
 	"Goroutines": 8,
 	"Scans": 6000,
 	"Maxlatency": 1000,
-	"TcpTimeout": 1000,
 	"Jitter": {
 		"Enable": true,
 		"MaxJitter": 50.0,
@@ -40,7 +37,9 @@
 		"Alpn": ["h2", "http/1.1"],
 		"Utls": {
 			"Enable": true,
-			"Fingerprint": "chrome"
+			"Fingerprint": "chrome",
+			"TcpTimeout": 1000,
+			"TcpRetry": 1
 		}
 	},
 	"HTTP/3": false,
