@@ -10,11 +10,11 @@ import (
 	"strings"
 )
 
-func GenIPsFromCIDR(netCIDR string, subnetMaskSize int, ignoreRange []string, allowRange []string) ([]string, error) {
+func GenIPsFromCIDR(ips *[]string, netCIDR string, subnetMaskSize int, ignoreRange []string, allowRange []string) {
 	prefix, err := netip.ParsePrefix(netCIDR)
-
 	if err != nil {
-		return nil, err
+		log.Fatalln(err)
+		return
 	}
 
 	for _, ignorePrefixStr := range ignoreRange {
@@ -23,11 +23,10 @@ func GenIPsFromCIDR(netCIDR string, subnetMaskSize int, ignoreRange []string, al
 			log.Fatalln(err)
 		}
 		if ignorePrefix.Overlaps(prefix) {
-			return []string{}, nil
+			return
 		}
 	}
 
-	var ips []string
 	if len(allowRange) > 0 {
 		for _, allowPrefixStr := range allowRange {
 			allowPrefix, err := netip.ParsePrefix(allowPrefixStr)
@@ -36,41 +35,29 @@ func GenIPsFromCIDR(netCIDR string, subnetMaskSize int, ignoreRange []string, al
 			}
 			if allowPrefix.Overlaps(prefix) {
 				for ip := prefix.Addr(); prefix.Contains(ip); ip = ip.Next() {
-					ips = append(ips, ip.String())
+					*ips = append(*ips, ip.String())
 				}
 			}
 		}
 	} else {
 		for ip := prefix.Addr(); prefix.Contains(ip); ip = ip.Next() {
-			ips = append(ips, ip.String())
+			*ips = append(*ips, ip.String())
 		}
 	}
-
-	return ips, nil
 }
 
-// ipv4filepath string
-func GenIPs(ipv4FilePath string, ignoreRange []string, allowRange []string) []string {
-	var allv4 []string
-
+func GenIPs(ips *[]string, ipv4FilePath string, ignoreRange []string, allowRange []string) {
 	file, ipListFileErr := os.ReadFile(ipv4FilePath)
 	if ipListFileErr != nil {
 		log.Fatalln(ipListFileErr)
 	}
 
 	for cidr := range strings.Lines(string(file)) {
-		ips, e := GenIPsFromCIDR(strings.TrimSpace(cidr), 24, ignoreRange, allowRange)
-		if e != nil {
-			continue
-		}
-		allv4 = append(allv4, ips...)
+		GenIPsFromCIDR(ips, strings.TrimSpace(cidr), 24, ignoreRange, allowRange)
 	}
-
-	return allv4
 }
 
 func randomIPv6FromCIDR(cidr string) (net.IP, error) {
-	// Parse the CIDR
 	_, ipNet, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return nil, err

@@ -91,6 +91,8 @@ type PingConfig struct {
 
 type Conf struct {
 	LogErr             bool                `json:"LogErr"`
+	CSV                bool                `json:"CSV"`
+	RandomScan         bool                `json:"RandomScan"`
 	Interface          string              `json:"Interface"`
 	Hostname           string              `json:"Hostname"`
 	Ports              []int               `json:"Ports"`
@@ -98,23 +100,21 @@ type Conf struct {
 	Headers            map[string][]string `json:"Headers"`
 	ResponseHeader     map[string]string   `json:"ResponseHeader"`
 	ResponseStatusCode []int               `json:"ResponseStatusCode"`
+	Padding            bool                `json:"Padding"`
+	PaddingSize        string              `json:"PaddingSize"`
 	Ping               PingConfig          `json:"Ping"`
 	Goroutines         int                 `json:"Goroutines"`
 	Scans              int                 `json:"Scans"`
 	Maxlatency         int64               `json:"Maxlatency"`
 	Jitter             JitterConfig        `json:"Jitter"`
-	IpVersion          string              `json:"IpVersion"`
+	IpVersion          int                 `json:"IpVersion"`
 	IplistPath         string              `json:"IplistPath"`
 	IgnoreRange        []string            `json:"IgnoreRange"`
 	AllowRange         []string            `json:"AllowRange"`
 	TLS                TLSConfig           `json:"TLS"`
 	HTTP3              bool                `json:"HTTP/3"`
 	Noises             NoiseConfig         `json:"Noises"`
-	LinearScan         bool                `json:"LinearScan"`
 	DomainScan         DS                  `json:"DomainScan"`
-	Padding            bool                `json:"Padding"`
-	PaddingSize        string              `json:"PaddingSize"`
-	CSV                bool                `json:"CSV"`
 	DownloadTest       DownloadConfig      `json:"DownloadTest"`
 }
 
@@ -142,14 +142,14 @@ func main() {
 
 	var ifaceIP net.IP
 
-	var ips []string
+	ips := make([]string, 0, 256)
 	switch conf.IpVersion {
-	case "v4":
+	case 4:
 		ifaceIP = net.ParseIP("0.0.0.0")
 		// Generate IPs from CIDRs
 		color.Yellow("Generating IPs\n")
-		ips = GenIPs(conf.IplistPath, conf.IgnoreRange, conf.AllowRange)
-	case "v6":
+		GenIPs(&ips, conf.IplistPath, conf.IgnoreRange, conf.AllowRange)
+	case 6:
 		ifaceIP = net.ParseIP("[::]")
 		// Load CIDRs into list and generate random IPv6 during scan
 		file, ipListFileErr := os.ReadFile(conf.IplistPath)
@@ -178,11 +178,11 @@ func main() {
 				continue
 			}
 			switch conf.IpVersion {
-			case "v4":
+			case 4:
 				if ip.To4() != nil {
 					ifaceIP = ip
 				}
-			case "v6":
+			case 6:
 				if ip.To4() == nil {
 					ifaceIP = ip
 				}
@@ -212,332 +212,186 @@ func main() {
 	LOG := conf.LogErr
 	color.Green("【ＨＴＴＰ Ｓｃａｎ】\n")
 	if !conf.DomainScan.Enable {
-		if !conf.LinearScan {
-			ch := make(chan string, conf.Goroutines)
-			for range conf.Goroutines {
-				go func() {
-					var client *http.Client
-					if conf.TLS.Enable {
-						if conf.HTTP3 {
-							client = h3transporter(&conf, nil, nil)
-						} else if !conf.TLS.Utls.Enable {
-							fmt.Println("simple tlsTransporter called")
-							client = tlsTransporter(&conf, nil)
-						}
-					} else {
-						client = http.DefaultClient
+		res_ch := make(chan string, conf.Goroutines)
+		ip_ch := make(chan string, conf.Goroutines)
+
+		// scanners
+		for range conf.Goroutines {
+			go func() {
+				var client *http.Client
+				if conf.TLS.Enable {
+					if conf.HTTP3 {
+						client = h3transporter(&conf, nil, nil)
+					} else if !conf.TLS.Utls.Enable {
+						client = tlsTransporter(&conf, nil)
 					}
-					for range conf.Scans {
-						ip := ""
-						if conf.IpVersion == "v6" {
-							ipv6, e := randomIPv6FromCIDR(strings.TrimSpace(ips[rand.Intn(len(ips))]))
-							if e != nil {
-								continue
+				} else {
+					client = http.DefaultClient
+				}
+
+				for {
+					ip, e := <-ip_ch
+					if !e {
+						break
+					}
+					minrtt := time.Millisecond
+					if conf.Ping.Enable {
+						// ping ip
+						pinger := probing.New(ip)
+						if conf.Interface != "" {
+							pinger.InterfaceName = conf.Interface
+						}
+						pinger.SetPrivileged(conf.Ping.Privileged)
+						pinger.Size = randomRange(conf.Ping.Size)
+						pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
+						pinger.Count = 1
+						pinging_err := pinger.Run()
+						if pinging_err != nil {
+							if LOG {
+								color.Red("PING: %s", pinging_err)
 							}
-							ip = fmt.Sprintf("[%s]", ipv6.String())
-						} else {
-							ip = ips[rand.Intn(len(ips))]
+							continue
 						}
 
-						minrtt := time.Millisecond
-						if conf.Ping.Enable {
-							// ping ip
-							pinger := probing.New(ip)
-							if conf.Interface != "" {
-								pinger.InterfaceName = conf.Interface
+						if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.Ping.MaxPing)*time.Millisecond) {
+							if LOG {
+								color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
 							}
-							pinger.SetPrivileged(conf.Ping.Privileged)
-							pinger.Size = randomRange(conf.Ping.Size)
-							pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
-							pinger.Count = 1
-							pinging_err := pinger.Run()
-							if pinging_err != nil {
+							continue
+						}
+
+						minrtt = pinger.Statistics().AvgRtt
+					}
+
+					for _, port := range conf.Ports {
+						ip := fmt.Sprintf("%s:%d", ip, port)
+						// generate http req
+						req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
+						req.Header = maps.Clone(conf.Headers)
+						req.Header.Set("Host", conf.Hostname)
+						if conf.Padding {
+							req.Header.Set("Cookie", RandomString(conf.PaddingSize))
+						}
+
+						s := time.Now()
+						if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
+							uclient, utlsE := utlsTransporter(&conf, fingerprint, nil, ip, ifaceIP)
+							if utlsE != nil {
 								if LOG {
-									color.Red("PING: %s", pinging_err)
+									color.Red("%s", utlsE.Error())
 								}
 								continue
 							}
-
-							if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.Ping.MaxPing)*time.Millisecond) {
-								if LOG {
-									color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
-								}
-								continue
+							client = uclient
+						}
+						client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
+						// send request
+						respone, http_err := client.Do(&req)
+						e := time.Now()
+						latency := e.UnixMilli() - s.UnixMilli()
+						if http_err != nil {
+							if LOG {
+								color.Red("%s", http_err.Error())
 							}
-
-							minrtt = pinger.Statistics().AvgRtt
+							continue
 						}
 
-						for _, port := range conf.Ports {
-							ip := fmt.Sprintf("%s:%d", ip, port)
-							// generate http req
-							req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
-							req.Header = maps.Clone(conf.Headers)
-							req.Header.Set("Host", conf.Hostname)
-							if conf.Padding {
-								req.Header.Set("Cookie", RandomString(conf.PaddingSize))
-							}
-
-							s := time.Now()
-							if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
-								uclient, utlsE := utlsTransporter(&conf, fingerprint, nil, ip, ifaceIP)
-								if utlsE != nil {
+						if slices.Contains(conf.ResponseStatusCode, respone.StatusCode) && match(respone.Header, conf.ResponseHeader) {
+							// Calc jiiter
+							jitter_str := "Null"
+							download_test := "Null"
+							if conf.Jitter.Enable {
+								latencies := []float64{}
+								jammed := false
+								for range conf.Jitter.Samples {
+									s := time.Now()
+									// send request
+									_, http_err := client.Do(&req)
+									e := time.Now()
+									latency := e.UnixMilli() - s.UnixMilli()
+									if http_err != nil {
+										jammed = true
+										break
+									}
+									latencies = append(latencies, float64(latency))
+									if conf.Jitter.Interval > 0 {
+										time.Sleep(time.Millisecond * time.Duration(conf.Jitter.Interval))
+									}
+								}
+								if jammed {
 									if LOG {
-										color.Red("%s", utlsE.Error())
+										color.Red("%s\t%s\t%d\tJAMMED\n", ip, minrtt, latency)
 									}
 									continue
 								}
-								client = uclient
+								jitter := Calc_jitter(latencies)
+								if jitter > conf.Jitter.MaxJitter {
+									color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
+									continue
+								}
+								jitter_str = fmt.Sprintf("%f", jitter)
 							}
-							client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
-							// send request
-							respone, http_err := client.Do(&req)
-							e := time.Now()
-							latency := e.UnixMilli() - s.UnixMilli()
-							if http_err != nil {
-								if LOG {
-									color.Red("%s", http_err.Error())
-								}
-								continue
+							if conf.DownloadTest.Enable {
+								download_test = downloadTest(client, &conf, ip, ifaceIP, fingerprint)
 							}
-
-							if slices.Contains(conf.ResponseStatusCode, respone.StatusCode) && match(respone.Header, conf.ResponseHeader) {
-								// Calc jiiter
-								jitter_str := "Null"
-								download_test := "Null"
-								if conf.Jitter.Enable {
-									latencies := []float64{}
-									jammed := false
-									for range conf.Jitter.Samples {
-										s := time.Now()
-										// send request
-										_, http_err := client.Do(&req)
-										e := time.Now()
-										latency := e.UnixMilli() - s.UnixMilli()
-										if http_err != nil {
-											jammed = true
-											break
-										}
-										latencies = append(latencies, float64(latency))
-										if conf.Jitter.Interval > 0 {
-											time.Sleep(time.Millisecond * time.Duration(conf.Jitter.Interval))
-										}
-									}
-									if jammed {
-										if LOG {
-											color.Red("%s\t%s\t%d\tJAMMED\n", ip, minrtt, latency)
-										}
-										continue
-									}
-									jitter := Calc_jitter(latencies)
-									if jitter > conf.Jitter.MaxJitter {
-										color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
-										continue
-									}
-									jitter_str = fmt.Sprintf("%f", jitter)
-								}
-								if conf.DownloadTest.Enable {
-									download_test = downloadTest(client, &conf, ip, ifaceIP, fingerprint)
-								}
-								rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, download_test)
-								color.Green("%s", rep)
-								if conf.CSV {
-									ch <- fmt.Sprintf("%s,%s,%d,%s,%s\n", ip, minrtt, latency, jitter_str, download_test)
-								} else {
-									ch <- rep
-								}
+							rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, download_test)
+							color.Green("%s", rep)
+							if conf.CSV {
+								res_ch <- fmt.Sprintf("%s,%s,%d,%s,%s\n", ip, minrtt, latency, jitter_str, download_test)
 							} else {
-								if LOG {
-									color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
-								}
+								res_ch <- rep
+							}
+						} else {
+							if LOG {
+								color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
 							}
 						}
 					}
-					ch <- "end"
-				}()
-			}
+				}
+			}()
+		}
 
+		go func() {
 			file := resultFile(conf.CSV)
 			defer file.Close()
 
-			deadgoroutines := 0
 			for {
-				if deadgoroutines == conf.Goroutines {
-					break
-				}
-				v, ok := <-ch
+				v, ok := <-res_ch
 				if !ok {
 					break
 				}
-				if v == "end" {
-					deadgoroutines += 1
-					color.Green("end of goroutine")
-					continue
-				}
 				file.Write([]byte(v))
 			}
-		} else {
-			if conf.IpVersion != "v4" {
-				log.Fatalln("Linear method is only available for ipv4")
-			}
-			res_Ch := make(chan string, conf.Goroutines)
-			ip_ch := make(chan string, conf.Goroutines)
+		}()
 
-			// scanners
-			for range conf.Goroutines {
-				go func() {
-					var client *http.Client
-					if conf.TLS.Enable {
-						if conf.HTTP3 {
-							client = h3transporter(&conf, nil, nil)
-						} else if !conf.TLS.Utls.Enable {
-							client = tlsTransporter(&conf, nil)
-						}
-					} else {
-						client = http.DefaultClient
-					}
-
-					for {
-						ip, e := <-ip_ch
-						if !e {
-							break
-						}
-						minrtt := time.Millisecond
-						if conf.Ping.Enable {
-							// ping ip
-							pinger := probing.New(ip)
-							if conf.Interface != "" {
-								pinger.InterfaceName = conf.Interface
-							}
-							pinger.SetPrivileged(conf.Ping.Privileged)
-							pinger.Size = randomRange(conf.Ping.Size)
-							pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
-							pinger.Count = 1
-							pinging_err := pinger.Run()
-							if pinging_err != nil {
-								if LOG {
-									color.Red("PING: %s", pinging_err)
-								}
-								continue
-							}
-
-							if pinger.Statistics().PacketLoss > 0 || pinger.Statistics().MinRtt > (time.Duration(conf.Ping.MaxPing)*time.Millisecond) {
-								if LOG {
-									color.Red("PING: %s\t%s\n", ip, pinger.Statistics().MinRtt)
-								}
-								continue
-							}
-
-							minrtt = pinger.Statistics().AvgRtt
-						}
-
-						for _, port := range conf.Ports {
-							ip := fmt.Sprintf("%s:%d", ip, port)
-							// generate http req
-							req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: ip, Path: conf.Path}, Host: conf.Hostname}
-							req.Header = maps.Clone(conf.Headers)
-							req.Header.Set("Host", conf.Hostname)
-							if conf.Padding {
-								req.Header.Set("Cookie", RandomString(conf.PaddingSize))
-							}
-
-							s := time.Now()
-							if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
-								uclient, utlsE := utlsTransporter(&conf, fingerprint, nil, ip, ifaceIP)
-								if utlsE != nil {
-									if LOG {
-										color.Red("%s", utlsE.Error())
-									}
-									continue
-								}
-								client = uclient
-							}
-							client.Timeout = time.Millisecond * time.Duration(conf.Maxlatency)
-							// send request
-							respone, http_err := client.Do(&req)
-							e := time.Now()
-							latency := e.UnixMilli() - s.UnixMilli()
-							if http_err != nil {
-								if LOG {
-									color.Red("%s", http_err.Error())
-								}
-								continue
-							}
-
-							if slices.Contains(conf.ResponseStatusCode, respone.StatusCode) && match(respone.Header, conf.ResponseHeader) {
-								// Calc jiiter
-								jitter_str := "Null"
-								download_test := "Null"
-								if conf.Jitter.Enable {
-									latencies := []float64{}
-									jammed := false
-									for range conf.Jitter.Samples {
-										s := time.Now()
-										// send request
-										_, http_err := client.Do(&req)
-										e := time.Now()
-										latency := e.UnixMilli() - s.UnixMilli()
-										if http_err != nil {
-											jammed = true
-											break
-										}
-										latencies = append(latencies, float64(latency))
-										if conf.Jitter.Interval > 0 {
-											time.Sleep(time.Millisecond * time.Duration(conf.Jitter.Interval))
-										}
-									}
-									if jammed {
-										if LOG {
-											color.Red("%s\t%s\t%d\tJAMMED\n", ip, minrtt, latency)
-										}
-										continue
-									}
-									jitter := Calc_jitter(latencies)
-									if jitter > conf.Jitter.MaxJitter {
-										color.Yellow("%s\t%s\t%d\t%f\n", ip, minrtt, latency, jitter)
-										continue
-									}
-									jitter_str = fmt.Sprintf("%f", jitter)
-								}
-								if conf.DownloadTest.Enable {
-									download_test = downloadTest(client, &conf, ip, ifaceIP, fingerprint)
-								}
-								rep := fmt.Sprintf("%s\t%s\t%d\t%s\t%s\n", ip, minrtt, latency, jitter_str, download_test)
-								color.Green("%s", rep)
-								if conf.CSV {
-									res_Ch <- fmt.Sprintf("%s,%s,%d,%s,%s\n", ip, minrtt, latency, jitter_str, download_test)
-								} else {
-									res_Ch <- rep
-								}
-							} else {
-								if LOG {
-									color.Red("%s\t%s\tHTTP.StatusCode=%d\n", ip, minrtt, respone.StatusCode)
-								}
-							}
-						}
-					}
-				}()
-			}
-
-			go func() {
-				file := resultFile(conf.CSV)
-				defer file.Close()
-
-				for {
-					v, ok := <-res_Ch
-					if !ok {
-						break
-					}
-					file.Write([]byte(v))
+		if conf.RandomScan {
+			switch conf.IpVersion {
+			case 4:
+				rand.Shuffle(len(ips), func(i, j int) {
+					ips[i], ips[j] = ips[j], ips[i]
+				})
+				for _, ip := range ips {
+					ip_ch <- ip
 				}
-			}()
-
+			case 6:
+				for {
+					ipv6, e := randomIPv6FromCIDR(strings.TrimSpace(ips[rand.Intn(len(ips))]))
+					if e != nil {
+						continue
+					}
+					ip_ch <- fmt.Sprintf("[%s]", ipv6.String())
+				}
+			}
+		} else {
+			if conf.IpVersion != 4 {
+				log.Fatalln("linear method is only available for ipv4")
+			}
 			for _, ip := range ips {
 				ip_ch <- ip
 			}
-
-			time.Sleep(time.Duration(conf.Maxlatency) * time.Millisecond)
 		}
+
+		time.Sleep(time.Duration(conf.Maxlatency*int64(len(conf.Ports))) * time.Millisecond)
 	} else {
 		// Domain Scan
 		domainListFile, domainListFileErr := os.ReadFile(conf.DomainScan.DomainListPath)

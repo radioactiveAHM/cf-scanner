@@ -1,16 +1,20 @@
 {
 	"LogErr": true,
+	"CSV": false,
+	"RandomScan": true,
 	"Interface": null,
 	"Hostname": "cp.cloudflare.com",
 	"Ports": [],
 	"Path": "/",
 	"Headers": {
-		"User-Agent": ["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:147.0) Gecko/20100101 Firefox/147.0"]
+		"User-Agent": ["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:149.0) Gecko/20100101 Firefox/149.0"]
 	},
 	"ResponseHeader": {
 		"Server": "cloudflare"
 	},
 	"ResponseStatusCode": [200, 204],
+	"Padding": true,
+	"PaddingSize": "1-100",
 	"Ping": {
 		"Enable": true,
 		"MaxPing": 300,
@@ -26,7 +30,7 @@
 		"Samples": 5,
 		"Interval": 200
 	},
-	"IpVersion": "v4",
+	"IpVersion": 4,
 	"IplistPath": "ipv4.txt",
 	"IgnoreRange": [],
 	"AllowRange": [],
@@ -58,7 +62,6 @@
 			}
 		]
 	},
-	"LinearScan": false,
 	"DomainScan": {
 		"Enable": false,
 		"DomainAsSNI": false,
@@ -67,9 +70,6 @@
 		"SkipIPV6": true,
 		"DomainListPath": "cloudfalare-domains.txt"
 	},
-	"Padding": true,
-	"PaddingSize": "1-100",
-	"CSV": false,
 	"DownloadTest": {
 		"Enable": false,
 		"SeparateConnection": false,

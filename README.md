@@ -89,21 +89,26 @@ go build -ldflags "-w -s"
 
 ```json
 {
+ "LogErr": true,
+ "CSV": false, // CSV format result.
+ "RandomScan": true,
+ "Interface": null,
  "Hostname": "cp.cloudflare.com", // The target hostname or domain to scan.
  "Ports": [], // If empty, defaults to port 443 for HTTPS and 80 for HTTP.
  "Path": "/", // The path to append to the hostname.
  "Headers": { // Additional HTTP headers.
-    "User-Agent": ["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0)"],
-    "Accept-Encoding": ["gzip", "br"]
+    "User-Agent": ["Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:149.0) Gecko/20100101 Firefox/149.0"],
  },
  "ResponseHeader": { // Headers that an HTTP response must include.
     "Server": "cloudflare"
  },
  "ResponseStatusCode": [200, 204], // Acceptable status codes.
+ "Padding": true, // Enable padding in HTTP requests by adding random text as cookies. This helps eliminate fixed-size requests.
+ "PaddingSize": "1-100", // Padding size range.
  "Ping": {
    "Enable": true, // Enable ping IP.
    "MaxPing": 300, // Maximum acceptable ping time (in milliseconds).
-   "Privileged": false, // SetPrivileged sets the type of ping pinger will send. false means pinger will send an "unprivileged" UDP ping. true means pinger will send a "privileged" raw ICMP ping. Setting to true requires that it be run with super-user privileges.
+   "Privileged": true, // SetPrivileged sets the type of ping pinger will send. false means pinger will send an "unprivileged" UDP ping. true means pinger will send a "privileged" raw ICMP ping. Setting to true requires that it be run with super-user privileges.
    "Size": "24-64" // Pinger packet size
  },
  "Goroutines": 8, // Number of concurrent goroutines for scanning.
@@ -111,11 +116,11 @@ go build -ldflags "-w -s"
  "Maxlatency": 1000, // Maximum acceptable latency (in milliseconds).
  "Jitter": {
    "Enable": true, // Enable jitter calculation.
-   "MaxJitter": 20.0, // Maximum acceptable jitter.
+   "MaxJitter": 50.0, // Maximum acceptable jitter.
    "Samples": 5, // Number of samples to calculate average jitter.
    "Interval": 200 // Delay (in ms) between consecutive jitter samples.
  },
- "IpVersion": "v4", // IP version (`v4` or `v6`).
+ "IpVersion": 4, // IP version (`4` or `6`).
  "IplistPath": "ipv4.txt", // Path to the file containing a list of IP addresses (e.g., `ipv4.txt`).
  "IgnoreRange": [], // List of IP ranges to ignore. (e.g., `["172.0.0.0/8", "104.0.0.0/8"]`).
  "AllowRange": [], // List of IP ranges to allow. (e.g., `["192.0.0.0/8", "8.14.0.0/16"]`).
@@ -126,7 +131,9 @@ go build -ldflags "-w -s"
    "Alpn": ["h2", "http/1.1"], // List of supported ALPN (Application-Layer Protocol Negotiation) protocols.
    "Utls": {
     "Enable": true, // Enable UTLS fingerprint.
-    "Fingerprint": "chrome" // Supported fingerprints are firefox, edge, chrome, 360 and ios.
+    "Fingerprint": "chrome", // Supported fingerprints are firefox, edge, chrome, 360 and ios.
+    "TcpTimeout": 1000,
+    "TcpRetry": 1
    }
  },
  "HTTP/3": false, // Enable HTTP version 3.
@@ -145,7 +152,6 @@ go build -ldflags "-w -s"
       }
     ]
  },
- "LinearScan": false, // Enable linear scanning.
  "DomainScan": {
     "Enable": false, // Enable domain scanning.
     "DomainAsSNI": false, // Use selected domain as SNI.
@@ -154,9 +160,6 @@ go build -ldflags "-w -s"
     "SkipIPV6": true, // Skip IPv6 as result of resolving domain.
     "DomainListPath": "cloudfalare-domains.txt" // Path to the file containing a list of domains
  },
- "Padding": true, // Enable padding in HTTP requests by adding random text as cookies. This helps eliminate fixed-size requests.
- "PaddingSize": "1-500", // Padding size range.
- "CSV": false, // CSV format result.
  "DownloadTest": {
     "Enable": false, // Enable the download speed test.
     "SeparateConnection": false, // Open new connection for download speed test. Enable for H3.
