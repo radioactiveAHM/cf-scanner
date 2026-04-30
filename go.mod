@@ -1,4 +1,4 @@
-module github.com/radioactiveAHM/cfscanner
+module github.com/radioactiveAHM/cf-scanner
 
 go 1.26.2
 
