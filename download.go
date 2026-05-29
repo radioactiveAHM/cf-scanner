@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"errors"
 	"log"
 	"net"
 	"net/http"
@@ -13,7 +13,7 @@ import (
 	utls "github.com/refraction-networking/utls"
 )
 
-func downloadTest(preclient *http.Client, conf *Conf, ip string, localIP net.IP, fingerprint utls.ClientHelloID) string {
+func downloadTest(preclient *http.Client, conf *Conf, ip string, localIP net.IP, fingerprint utls.ClientHelloID) (float64, error) {
 	configUrl, configUrlErr := url.Parse(conf.DownloadTest.Url)
 	if configUrlErr != nil {
 		log.Fatalln(configUrlErr)
@@ -39,7 +39,7 @@ func downloadTest(preclient *http.Client, conf *Conf, ip string, localIP net.IP,
 				if conf.TLS.Utls.Enable {
 					uclient, utlsE := utlsTransporter(conf, fingerprint, conf.DownloadTest.SNI, ip, localIP)
 					if utlsE != nil {
-						return "FAILED"
+						return -1, errors.New("FAILED")
 					}
 					client = uclient
 				} else {
@@ -55,16 +55,17 @@ func downloadTest(preclient *http.Client, conf *Conf, ip string, localIP net.IP,
 	respone, http_err := client.Do(&req)
 	if http_err != nil {
 		color.Red("%s", http_err.Error())
-		return "FAILED"
+		return -1, errors.New("FAILED")
 	}
 	if respone.StatusCode != 200 {
 		color.Red("Download host status code: %s", respone.Status)
-		return "FAILED"
+		return -1, errors.New("FAILED")
 	}
 
 	reader := respone.Body
 	defer reader.Close()
-	ch := make(chan string)
+	errCh := make(chan error)
+	bytesPerSecond := make(chan float64)
 	go func() {
 		buf := make([]byte, 1024*8)
 		read := 0
@@ -82,20 +83,21 @@ func downloadTest(preclient *http.Client, conf *Conf, ip string, localIP net.IP,
 		elapsed := time.Now()
 
 		if read < conf.DownloadTest.TargetBytes {
-			ch <- "JAMMED"
+			errCh <- errors.New("JAMMED")
 			return
 		}
 
-		latency := float32(elapsed.UnixMilli()-start.UnixMilli()) / 1000
+		latency := float64(elapsed.UnixMilli()-start.UnixMilli()) / 1000
 
-		bytesPerSecond := float32(read) / latency
-		ch <- fmt.Sprintf("%fMB/S", bytesPerSecond/1000000)
+		bytesPerSecond <- float64(read) / latency
 	}()
 
 	select {
-	case report := <-ch:
-		return report
+	case err := <-errCh:
+		return -1, err
+	case report := <-bytesPerSecond:
+		return report, nil
 	case <-time.After(time.Millisecond * time.Duration(conf.DownloadTest.Timeout)):
-		return "Timeout"
+		return -1, errors.New("TIMEOUT")
 	}
 }
