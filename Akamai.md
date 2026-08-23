@@ -7,7 +7,6 @@
  "LogErr": true,
  "CSV": false,
  "RandomScan": true,
- "Interface": null,
  "Hostname": "{ip}",
  "Ports": [],
  "Path": "/",

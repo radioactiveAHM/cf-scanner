@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -94,7 +93,6 @@ type Conf struct {
 	LogErr             bool                `json:"LogErr"`
 	CSV                bool                `json:"CSV"`
 	RandomScan         bool                `json:"RandomScan"`
-	Interface          string              `json:"Interface"`
 	Hostname           string              `json:"Hostname"`
 	Ports              []int               `json:"Ports"`
 	Path               string              `json:"Path"`
@@ -140,17 +138,13 @@ func main() {
 	// 	}
 	// }
 
-	var ifaceIP net.IP
-
 	ips := make([]string, 0, 256)
 	switch conf.IpVersion {
 	case 4:
-		ifaceIP = net.ParseIP("0.0.0.0")
 		// Generate IPs from CIDRs
 		color.Yellow("Generating IPs\n")
 		GenIPs(&ips, conf.IplistPath, conf.IgnoreRange, conf.AllowRange)
 	case 6:
-		ifaceIP = net.ParseIP("[::]")
 		// Load CIDRs into list and generate random IPv6 during scan
 		file, ipListFileErr := os.ReadFile(conf.IplistPath)
 		if ipListFileErr != nil {
@@ -160,37 +154,6 @@ func main() {
 	default:
 		log.Fatalln("Invalid IP version")
 	}
-
-	if conf.Interface != "" {
-		iface, getIfaceErr := net.InterfaceByName(conf.Interface)
-		if getIfaceErr != nil {
-			log.Println(getIfaceErr)
-		}
-
-		addrs, getAddrsErr := iface.Addrs()
-		if getAddrsErr != nil {
-			log.Println(getAddrsErr)
-		}
-
-		for _, ip := range addrs {
-			ip, _, e := net.ParseCIDR(ip.String())
-			if e != nil {
-				continue
-			}
-			switch conf.IpVersion {
-			case 4:
-				if ip.To4() != nil {
-					ifaceIP = ip
-				}
-			case 6:
-				if ip.To4() == nil {
-					ifaceIP = ip
-				}
-			}
-		}
-	}
-
-	color.Yellow("Interface IP: %s", ifaceIP.String())
 
 	fingerprint := utls.HelloChrome_Auto
 	if conf.TLS.Utls.Enable {
@@ -240,9 +203,6 @@ func main() {
 					if conf.Ping.Enable {
 						// ping ip
 						pinger := probing.New(ip)
-						if conf.Interface != "" {
-							pinger.InterfaceName = conf.Interface
-						}
 						pinger.SetPrivileged(conf.Ping.Privileged)
 						pinger.Size = randomRange(conf.Ping.Size)
 						pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
@@ -266,17 +226,20 @@ func main() {
 					}
 
 					for _, port := range conf.Ports {
-						addr := fmt.Sprintf("%s:%d", ip, port)
+						ip := net.ParseIP(ip)
+						if ip == nil {
+							continue
+						}
+						addr := net.TCPAddr{IP: ip, Port: port}
 
 						// generate http req
 						var hostname string
 						if strings.Contains(conf.Hostname, "{ip}") {
-							hostname = ip
+							hostname = addr.String()
 						} else {
 							hostname = conf.Hostname
 						}
-						req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: addr, Path: conf.Path}, Host: hostname}
-						req.Header = maps.Clone(conf.Headers)
+						req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: addr.String(), Path: conf.Path}, Host: hostname, Header: maps.Clone(conf.Headers)}
 						req.Header.Set("Host", hostname)
 						if conf.Padding {
 							req.Header.Set("Cookie", RandomString(conf.PaddingSize))
@@ -284,7 +247,7 @@ func main() {
 
 						s := time.Now()
 						if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
-							uclient, utlsE := utlsTransporter(&conf, fingerprint, conf.TLS.SNI, addr, ifaceIP)
+							uclient, utlsE := utlsTransporter(&conf, fingerprint, conf.TLS.SNI, addr)
 							if utlsE != nil {
 								if LOG {
 									color.Red("%s", utlsE)
@@ -346,18 +309,18 @@ func main() {
 								jitter_str = fmt.Sprintf("%f", jitter)
 							}
 							if conf.DownloadTest.Enable {
-								download_test = downloadTest(client, &conf, addr, ifaceIP, fingerprint)
+								download_test = downloadTest(client, &conf, addr, fingerprint)
 							}
-							rep := fmt.Sprintf("%-21s %-12s %d\t%s\t%s\n", addr, minrtt, latency, jitter_str, download_test)
+							rep := fmt.Sprintf("%-21s %-12s %d\t%s\t%s\n", addr.String(), minrtt, latency, jitter_str, download_test)
 							color.Green("%s", rep)
 							if conf.CSV {
-								file.Write(fmt.Sprintf("%s,%s,%d,%s,%s\n", addr, minrtt, latency, jitter_str, download_test))
+								file.Write(fmt.Sprintf("%s,%s,%d,%s,%s\n", addr.String(), minrtt, latency, jitter_str, download_test))
 							} else {
 								file.Write(rep)
 							}
 						} else {
 							if LOG {
-								color.Red("%s\t%s\tHTTP.StatusCode=%d", addr, minrtt, respone.StatusCode)
+								color.Red("%s\t%s\tHTTP.StatusCode=%d", addr.String(), minrtt, respone.StatusCode)
 							}
 						}
 					}
@@ -380,7 +343,7 @@ func main() {
 					if e != nil {
 						continue
 					}
-					ip_ch <- fmt.Sprintf("[%s]", ipv6.String())
+					ip_ch <- ipv6.String()
 				}
 			}
 		} else {
@@ -430,9 +393,6 @@ func main() {
 						if conf.Ping.Enable {
 							// ping ip
 							pinger := probing.New(ip.String())
-							if conf.Interface != "" {
-								pinger.InterfaceName = conf.Interface
-							}
 							pinger.SetPrivileged(conf.Ping.Privileged)
 							pinger.Size = randomRange(conf.Ping.Size)
 							pinger.Timeout = time.Duration(conf.Ping.MaxPing) * time.Millisecond
@@ -456,14 +416,14 @@ func main() {
 							minrtt = pinger.Statistics().AvgRtt
 						}
 						for _, port := range conf.Ports {
-							ip := fmt.Sprintf("%s:%d", ip, port)
+							addr := net.TCPAddr{IP: ip, Port: port}
+
 							// generate http req
 							host := conf.Hostname
 							if conf.DomainScan.DomainAsHost {
 								host = domain
 							}
-							req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: ip, Path: conf.Path}, Host: host}
-							req.Header = maps.Clone(conf.Headers)
+							req := http.Request{Method: "GET", URL: &url.URL{Scheme: scheme, Host: addr.String(), Path: conf.Path}, Host: host, Header: maps.Clone(conf.Headers)}
 							req.Header.Set("Host", host)
 							if conf.Padding {
 								req.Header.Set("Cookie", RandomString(conf.PaddingSize))
@@ -486,7 +446,7 @@ func main() {
 
 							s := time.Now()
 							if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
-								uclient, utlsE := utlsTransporter(&conf, fingerprint, sni, ip, ifaceIP)
+								uclient, utlsE := utlsTransporter(&conf, fingerprint, sni, addr)
 								if utlsE != nil {
 									if LOG {
 										color.Red("%s", utlsE)
@@ -548,7 +508,7 @@ func main() {
 									jitter_str = fmt.Sprintf("%f", jitter)
 								}
 								if conf.DownloadTest.Enable {
-									download_test = downloadTest(client, &conf, ip, ifaceIP, fingerprint)
+									download_test = downloadTest(client, &conf, addr, fingerprint)
 								}
 								rep := fmt.Sprintf("%s:\t%s\t%s\t%d\t%s\t%s\n", domain, ip, minrtt, latency, jitter_str, download_test)
 								color.Green("%s", rep)
@@ -663,22 +623,13 @@ func h3transporter(conf *Conf, sni *string, qc *quic.Config) *http.Client {
 	}
 }
 
-func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni string, addr string, localIP net.IP) (*http.Client, error) {
-	dialer := &net.Dialer{
-		Timeout: time.Millisecond * time.Duration(conf.TLS.Utls.TcpTimeout),
-		LocalAddr: &net.TCPAddr{
-			IP: localIP,
-		},
-	}
-
-	if conf.Interface != "" && runtime.GOOS == "linux" {
-		BindDevice(conf, dialer)
-	}
+func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni string, addr net.TCPAddr) (*http.Client, error) {
+	dialer := &net.Dialer{Timeout: time.Millisecond * time.Duration(conf.TLS.Utls.TcpTimeout)}
 
 	var dialConn net.Conn
 	var err error
 	for reconnect := range conf.TLS.Utls.TcpConnectAttempt {
-		dialConn, err = dialer.Dial("tcp", addr)
+		dialConn, err = dialer.Dial("tcp", addr.String())
 		if err != nil {
 			if !errors.Is(err, context.DeadlineExceeded) {
 				return nil, err
@@ -694,7 +645,7 @@ func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni string, add
 
 	uTlsConf := utls.Config{InsecureSkipVerify: conf.TLS.Insecure}
 	if strings.Contains(sni, "{ip}") {
-		sni = strings.Split(addr, ":")[0]
+		sni = addr.IP.String()
 	}
 	if sni != "" {
 		uTlsConf.ServerName = sni
@@ -706,9 +657,9 @@ func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni string, add
 	if err := uTlsConn.HandshakeContext(ctx); err != nil {
 		uTlsConn.Close()
 		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, fmt.Errorf("%s: UTLS handshake timeout", addr)
+			return nil, fmt.Errorf("%s: UTLS handshake timeout", addr.String())
 		}
-		return nil, fmt.Errorf("%s: UTLS handshake error: %w", addr, err)
+		return nil, fmt.Errorf("%s: UTLS handshake error: %w", addr.String(), err)
 	}
 
 	if uTlsConn.ConnectionState().NegotiatedProtocol == "h2" {

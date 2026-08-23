@@ -11,19 +11,19 @@ type FileMutex struct {
 	locker sync.Mutex
 }
 
-func (self *FileMutex) Write(data string) error {
-	self.locker.Lock()
-	defer self.locker.Unlock()
+func (fm *FileMutex) Write(data string) error {
+	fm.locker.Lock()
+	defer fm.locker.Unlock()
 
-	_, err := self.file.WriteString(data)
+	_, err := fm.file.WriteString(data)
 	return err
 }
 
-func (self *FileMutex) Close() error {
-	self.locker.Lock()
-	defer self.locker.Unlock()
+func (fm *FileMutex) Close() error {
+	fm.locker.Lock()
+	defer fm.locker.Unlock()
 
-	return self.file.Close()
+	return fm.file.Close()
 }
 
 func resultFile(csv bool) *os.File {

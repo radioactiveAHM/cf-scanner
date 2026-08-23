@@ -2,7 +2,6 @@
 	"LogErr": true,
 	"CSV": false,
 	"RandomScan": true,
-	"Interface": null,
 	"Hostname": "cp.cloudflare.com",
 	"Ports": [],
 	"Path": "/",

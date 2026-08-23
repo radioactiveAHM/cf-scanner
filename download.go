@@ -13,7 +13,7 @@ import (
 	utls "github.com/refraction-networking/utls"
 )
 
-func downloadTest(preclient *http.Client, conf *Conf, ip string, localIP net.IP, fingerprint utls.ClientHelloID) string {
+func downloadTest(preclient *http.Client, conf *Conf, addr net.TCPAddr, fingerprint utls.ClientHelloID) string {
 	configUrl, configUrlErr := url.Parse(conf.DownloadTest.Url)
 	if configUrlErr != nil {
 		log.Fatalln(configUrlErr)
@@ -32,7 +32,7 @@ func downloadTest(preclient *http.Client, conf *Conf, ip string, localIP net.IP,
 				)
 			} else {
 				if conf.TLS.Utls.Enable {
-					uclient, utlsE := utlsTransporter(conf, fingerprint, conf.DownloadTest.SNI, ip, localIP)
+					uclient, utlsE := utlsTransporter(conf, fingerprint, conf.DownloadTest.SNI, addr)
 					if utlsE != nil {
 						return "FAILED"
 					}
@@ -46,7 +46,7 @@ func downloadTest(preclient *http.Client, conf *Conf, ip string, localIP net.IP,
 		}
 	}
 
-	req := http.Request{Method: "GET", URL: &url.URL{Scheme: configUrl.Scheme, Host: ip, Path: configUrl.Path, RawQuery: configUrl.RawQuery}, Host: configUrl.Host}
+	req := http.Request{Method: "GET", URL: &url.URL{Scheme: configUrl.Scheme, Host: addr.String(), Path: configUrl.Path, RawQuery: configUrl.RawQuery}, Host: configUrl.Host}
 	respone, http_err := client.Do(&req)
 	if http_err != nil {
 		color.Red("%s", http_err.Error())
