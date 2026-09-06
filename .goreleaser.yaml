@@ -46,6 +46,7 @@ archives:
       - ipv4_old.txt
       - ipv6.txt
       - cloudfalare-domains.txt
+      - cloudflare-iran-domains.txt
       - Akamai.txt
       - Fastly.txt
     # this name template makes the OS and Arch compatible with the results of `uname`.

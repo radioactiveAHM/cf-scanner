@@ -78,7 +78,7 @@ go build -ldflags "-w -s"
 {
  "LogErr": true,
  "CSV": false, // CSV format result.
- "RandomScan": true,
+ "RandomScan": true, // Shuffle ip list.
  "Hostname": "cp.cloudflare.com", // The target hostname or domain to scan. Use "{ip}" to use ip as hostname.
  "Ports": [], // If empty, defaults to port 443 for HTTPS and 80 for HTTP.
  "Path": "/", // The path to append to the hostname.
@@ -98,7 +98,7 @@ go build -ldflags "-w -s"
    "Size": "24-64" // Pinger packet size
  },
  "Goroutines": 16, // Number of concurrent goroutines for scanning.
- "Maxlatency": 1000, // Maximum acceptable latency (in milliseconds).
+ "Maxlatency": 2000, // Maximum acceptable latency (in milliseconds).
  "Jitter": {
    "Enable": true, // Enable jitter calculation.
    "MaxJitter": 50.0, // Maximum acceptable jitter.
@@ -118,7 +118,13 @@ go build -ldflags "-w -s"
     "Enable": true, // Enable UTLS fingerprint.
     "Fingerprint": "chrome", // Supported fingerprints are firefox, edge, chrome, 360 and ios.
     "TcpTimeout": 1000,
-    "TcpConnectAttempt": 1
+    "TcpConnectAttempt": 1,
+    "Fragment": {
+      "Enable": false, // Enable TLS client hello fragmenting.
+      "Length": "50-100", // Fragment size range in bytes. MUST be in range string format "A-B".
+      "Delay": "10-15", // Interval between fragments in milliseconds. MUST be in range string format "A-B". null=0.
+      "MaxSplit": null // Maximum number of splits. This limits how many pieces a single packet can be broken into. 0 means unlimited. MUST be in range string format "A-B". null=0.
+    }
    }
  },
  "HTTP/3": false, // Enable HTTP version 3.

@@ -13,7 +13,7 @@ import (
 	utls "github.com/refraction-networking/utls"
 )
 
-func downloadTest(preclient *http.Client, conf *Conf, addr net.TCPAddr, fingerprint utls.ClientHelloID) string {
+func downloadTest(preclient *http.Client, conf *Conf, addr net.TCPAddr, fingerprint utls.ClientHelloID, fragment *Fragment) string {
 	configUrl, configUrlErr := url.Parse(conf.DownloadTest.Url)
 	if configUrlErr != nil {
 		log.Fatalln(configUrlErr)
@@ -32,7 +32,7 @@ func downloadTest(preclient *http.Client, conf *Conf, addr net.TCPAddr, fingerpr
 				)
 			} else {
 				if conf.TLS.Utls.Enable {
-					uclient, utlsE := utlsTransporter(conf, fingerprint, conf.DownloadTest.SNI, addr)
+					uclient, utlsE := utlsTransporter(conf, fingerprint, conf.DownloadTest.SNI, addr, fragment)
 					if utlsE != nil {
 						return "FAILED"
 					}

@@ -60,11 +60,19 @@ type DownloadConfig struct {
 	Timeout            int    `json:"Timeout"`
 }
 
+type FragmentConfig struct {
+	Enable   bool   `json:"Enable"`
+	Length   string `json:"Length"`
+	Delay    string `json:"Delay"`
+	MaxSplit string `json:"MaxSplit"`
+}
+
 type UtlsConfig struct {
-	Enable            bool   `json:"Enable"`
-	Fingerprint       string `json:"Fingerprint"`
-	TcpTimeout        int64  `json:"TcpTimeout"`
-	TcpConnectAttempt int    `json:"TcpConnectAttempt"`
+	Enable            bool           `json:"Enable"`
+	Fingerprint       string         `json:"Fingerprint"`
+	TcpTimeout        int64          `json:"TcpTimeout"`
+	TcpConnectAttempt int            `json:"TcpConnectAttempt"`
+	Fragment          FragmentConfig `json:"Fragment"`
 }
 
 type TLSConfig struct {
@@ -172,6 +180,20 @@ func main() {
 		}
 	}
 
+	LengthMin, LengthMax := parseRange(conf.TLS.Utls.Fragment.Length)
+	IntervalMin, IntervalMax := parseRange(conf.TLS.Utls.Fragment.Delay)
+	MaxSplitMin, MaxSplitMax := parseRange(conf.TLS.Utls.Fragment.MaxSplit)
+	fragment := Fragment{
+		PacketsFrom: 0,
+		PacketsTo:   1,
+		LengthMin:   uint64(LengthMin),
+		LengthMax:   uint64(LengthMax),
+		IntervalMin: uint64(IntervalMin),
+		IntervalMax: uint64(IntervalMax),
+		MaxSplitMin: uint64(MaxSplitMin),
+		MaxSplitMax: uint64(MaxSplitMax),
+	}
+
 	file := FileMutex{
 		file: resultFile(conf.CSV),
 	}
@@ -247,7 +269,7 @@ func main() {
 
 						s := time.Now()
 						if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
-							uclient, utlsE := utlsTransporter(&conf, fingerprint, conf.TLS.SNI, addr)
+							uclient, utlsE := utlsTransporter(&conf, fingerprint, conf.TLS.SNI, addr, &fragment)
 							if utlsE != nil {
 								if LOG {
 									color.Red("%s", utlsE)
@@ -309,7 +331,7 @@ func main() {
 								jitter_str = fmt.Sprintf("%f", jitter)
 							}
 							if conf.DownloadTest.Enable {
-								download_test = downloadTest(client, &conf, addr, fingerprint)
+								download_test = downloadTest(client, &conf, addr, fingerprint, &fragment)
 							}
 							rep := fmt.Sprintf("%-21s %-12s %d\t%s\t%s\n", addr.String(), minrtt, latency, jitter_str, download_test)
 							color.Green("%s", rep)
@@ -446,7 +468,7 @@ func main() {
 
 							s := time.Now()
 							if conf.TLS.Utls.Enable && conf.TLS.Enable && !conf.HTTP3 {
-								uclient, utlsE := utlsTransporter(&conf, fingerprint, sni, addr)
+								uclient, utlsE := utlsTransporter(&conf, fingerprint, sni, addr, &fragment)
 								if utlsE != nil {
 									if LOG {
 										color.Red("%s", utlsE)
@@ -508,7 +530,7 @@ func main() {
 									jitter_str = fmt.Sprintf("%f", jitter)
 								}
 								if conf.DownloadTest.Enable {
-									download_test = downloadTest(client, &conf, addr, fingerprint)
+									download_test = downloadTest(client, &conf, addr, fingerprint, &fragment)
 								}
 								rep := fmt.Sprintf("%s:\t%s\t%s\t%d\t%s\t%s\n", domain, ip, minrtt, latency, jitter_str, download_test)
 								color.Green("%s", rep)
@@ -574,6 +596,24 @@ func RandomString(n string) string {
 	return base64.RawURLEncoding.EncodeToString(bytes)
 }
 
+func parseRange(r string) (a int, b int) {
+	if !strings.Contains(r, "-") {
+		return 0, 0
+	}
+
+	ab := strings.Split(r, "-")
+	a, a_err := strconv.Atoi(ab[0])
+	if a_err != nil {
+		log.Fatalln(a_err)
+	}
+	b, b_err := strconv.Atoi(ab[1])
+	if b_err != nil {
+		log.Fatalln(b_err)
+	}
+
+	return a, b
+}
+
 func randomRange(r string) int {
 	ab := strings.Split(r, "-")
 	a, a_err := strconv.Atoi(ab[0])
@@ -623,7 +663,7 @@ func h3transporter(conf *Conf, sni *string, qc *quic.Config) *http.Client {
 	}
 }
 
-func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni string, addr net.TCPAddr) (*http.Client, error) {
+func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni string, addr net.TCPAddr, fragment *Fragment) (*http.Client, error) {
 	dialer := &net.Dialer{Timeout: time.Millisecond * time.Duration(conf.TLS.Utls.TcpTimeout)}
 
 	var dialConn net.Conn
@@ -649,6 +689,14 @@ func utlsTransporter(conf *Conf, fingerprint utls.ClientHelloID, sni string, add
 	}
 	if sni != "" {
 		uTlsConf.ServerName = sni
+	}
+
+	if conf.TLS.Utls.Fragment.Enable {
+		dialConn = ConnWrap{
+			fragment: fragment,
+			conn:     dialConn,
+			count:    0,
+		}
 	}
 
 	uTlsConn := utls.UClient(dialConn, &uTlsConf, fingerprint)

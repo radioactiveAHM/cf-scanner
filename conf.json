@@ -21,7 +21,7 @@
 		"Size": "24-65"
 	},
 	"Goroutines": 16,
-	"Maxlatency": 1000,
+	"Maxlatency": 2000,
 	"Jitter": {
 		"Enable": true,
 		"MaxJitter": 50.0,
@@ -41,7 +41,13 @@
 			"Enable": true,
 			"Fingerprint": "chrome",
 			"TcpTimeout": 1000,
-			"TcpConnectAttempt": 1
+			"TcpConnectAttempt": 1,
+			"Fragment": {
+				"Enable": false,
+				"Length": "50-100",
+				"Delay": "10-15",
+				"MaxSplit": null
+			}
 		}
 	},
 	"HTTP/3": false,
