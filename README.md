@@ -10,6 +10,11 @@ Cloudflare scanner
 
 **This scanner can be used with any CDN, provided you have the necessary requirements, such as an IP list or domain list for scanning. By default, it is configured to target Cloudflare. [Please review the JSON configuration document below.](#configuration-parameters)**
 
+## Support (حمایت)
+
+- GRAM (TON): UQDb3zwscuviCuDl5EYkuqPni1gZ8XyESNJ51-9GdVW-hWZ3
+- USDT (TRC20): TSmDnaRy8cjuhPb6X7YANB82qBpARHi6af
+
 ## IRAN
 
 [اسکن akamai برای سایفون](/Akamai.md)
@@ -43,9 +48,9 @@ Cloudflare scanner
 - [x] Ping + Latency + Jitter + Download speed test
 - [x] UTLS
 - [x] Noise for HTTP/3
-- [x] UDP scan
 - [x] CSV format result
 - [x] Padding
+- [x] Fragment
 
 ## Build
 

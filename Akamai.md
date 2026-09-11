@@ -21,7 +21,7 @@
   "Privileged": true,
   "Size": "24-65"
  },
- "Goroutines": 8,
+ "Goroutines": 16,
  "Maxlatency": 20000,
  "Jitter": {
   "Enable": false,
@@ -42,7 +42,13 @@
    "Enable": true,
    "Fingerprint": "chrome",
    "TcpTimeout": 1000,
-   "TcpConnectAttempt": 1
+   "TcpConnectAttempt": 1,
+   "Fragment": {
+    "Enable": false,
+    "Length": "50-100",
+    "Delay": "10-15",
+    "MaxSplit": null
+   }
   }
  },
  "HTTP/3": false,
