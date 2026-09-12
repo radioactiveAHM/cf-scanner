@@ -81,9 +81,10 @@ go build -ldflags "-w -s"
 
 ```json
 {
- "LogErr": true,
+ "ProgressBar": true,   // Enable the progress bar. When enabled, logging is disabled. This option is available only for IPv4 scanning.
+ "Log": true,  // Enable Logging.
  "CSV": false, // CSV format result.
- "RandomScan": true, // Shuffle ip list.
+ "RandomScan": true, // Shuffle ip list. only for ipv4 scanning.
  "Hostname": "cp.cloudflare.com", // The target hostname or domain to scan. Use "{ip}" to use ip as hostname.
  "Ports": [], // If empty, defaults to port 443 for HTTPS and 80 for HTTP.
  "Path": "/", // The path to append to the hostname.

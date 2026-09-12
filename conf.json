@@ -1,5 +1,6 @@
 {
-	"LogErr": true,
+	"ProgressBar": true,
+	"Log": true,
 	"CSV": false,
 	"RandomScan": true,
 	"Hostname": "cp.cloudflare.com",
