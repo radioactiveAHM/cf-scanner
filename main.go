@@ -406,10 +406,18 @@ func main() {
 			})
 		}
 
+		var pbar *progressbar.ProgressBar
+		if conf.ProgressBar {
+			pbar = progressbar.Default(int64(len(domains)))
+		}
+
 		var wg sync.WaitGroup
 		for domainsChunk := range slices.Chunk(domains, len(domains)/conf.Goroutines) {
 			wg.Go(func() {
 				for _, domain := range domainsChunk {
+					if conf.ProgressBar {
+						pbar.Add(1)
+					}
 					domain := strings.TrimSpace(domain)
 					ips, resolve_err := net.LookupIP(domain)
 					if resolve_err != nil {
