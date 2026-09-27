@@ -391,6 +391,7 @@ func main() {
 			}
 		}
 
+		close(ip_ch)
 		wg.Wait()
 	} else {
 		// Domain Scan
