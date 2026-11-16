@@ -38,9 +38,9 @@ Cloudflare scanner
    - اگر مقدار جیتر بیشتر از حد مجاز باشد، خروجی **زرد** می‌شود.  
    - اگر هنگام محاسبه جیتر اتصال قطع شود یا پاسخی دریافت نشود، خروجی **قرمز** شده و در انتهای خروجی عبارت **jammed** درج می‌شود.
 
-## Notes
+## Graph
 
-- To fetch the latest `ipv4.txt`, delete the existing file. It will be automatically downloaded from the [cf-tools latest release](https://github.com/compassvpn/cf-tools/releases/latest). If the download fails, it will gracefully fall back to `ipv4_old.txt`.
+![Graph](/graph.webp)
 
 ## features
 
