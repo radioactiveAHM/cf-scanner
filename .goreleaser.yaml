@@ -27,6 +27,9 @@ builds:
       - 386
       - amd64
       - arm64
+    goamd64:
+      - v1
+      - v3
   - id: linux-arm
     env:
       - CGO_ENABLED=0
@@ -53,7 +56,7 @@ archives:
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
+      {{- if eq .Arch "amd64" }}x86_64{{.Amd64}}
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
